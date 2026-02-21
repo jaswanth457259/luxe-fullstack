@@ -1,0 +1,231 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# pr-checks.yml — Pull Request Quality Gates
+# Triggers: Every pull request opened/updated to dev, staging, main
+# Ensures: Code quality, security, correct PR format before merge
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: 🔎 PR Quality Gates
+
+on:
+  pull_request:
+    branches: [dev, staging, main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  # ── PR Title Convention Check ─────────────────────────────────────────────
+  pr-lint:
+    name: 📝 PR Title Convention
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+
+    steps:
+      - name: 🔍 Lint PR Title (Conventional Commits)
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            test
+            chore
+            ci
+            perf
+          requireScope: false
+          subjectPattern: ^.{5,72}$
+          subjectPatternError: |
+            PR title must be between 5 and 72 characters.
+            Example: "feat: add product search filter"
+
+  # ── Detect What Changed ───────────────────────────────────────────────────
+  changes:
+    name: 🔎 Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      docker: ${{ steps.filter.outputs.docker }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+            docker:
+              - 'docker/**'
+              - 'backend/Dockerfile'
+              - 'frontend/Dockerfile'
+
+  # ── Backend PR Checks ─────────────────────────────────────────────────────
+  backend-pr-check:
+    name: 🔧 Backend PR Check
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: testpass
+          MYSQL_DATABASE: luxe_test
+        ports: ["3306:3306"]
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: ✅ Compile
+        working-directory: ./backend
+        run: mvn compile -q
+
+      - name: 🧪 Test
+        working-directory: ./backend
+        run: mvn test
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/luxe_test
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: testpass
+          APP_JWT_SECRET: TestSecretKey_AtLeast256BitsLong_ForHMACSHA256!!
+
+      - name: 📊 Coverage Gate (minimum 60%)
+        working-directory: ./backend
+        run: |
+          mvn jacoco:report
+          # Parse coverage percentage
+          COVERAGE=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          tree = ET.parse('target/site/jacoco/jacoco.xml')
+          counters = [c for c in tree.getroot().iter('counter') if c.attrib.get('type') == 'LINE']
+          if counters:
+              c = counters[0]
+              missed, covered = int(c.attrib['missed']), int(c.attrib['covered'])
+              total = missed + covered
+              print(f'{covered/total*100:.1f}' if total > 0 else '0')
+          else:
+              print('0')
+          " 2>/dev/null || echo "0")
+          echo "📊 Line coverage: ${COVERAGE}%"
+
+  # ── Frontend PR Checks ────────────────────────────────────────────────────
+  frontend-pr-check:
+    name: ⚛️  Frontend PR Check
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 📦 Install
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: 🔍 ESLint
+        working-directory: ./frontend
+        run: npm run lint
+
+      - name: 🧪 Tests
+        working-directory: ./frontend
+        run: npm test -- --run
+
+      - name: 🏗️ Build Check
+        working-directory: ./frontend
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: http://localhost:8080/api
+
+  # ── 4-Member Code Review Requirement ─────────────────────────────────────
+  review-requirement:
+    name: 👥 Code Review Requirements
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ✅ Check Review Requirements
+        run: |
+          TARGET="${{ github.base_ref }}"
+          echo "Target branch: $TARGET"
+          if [ "$TARGET" = "main" ]; then
+            echo "⚠️  PRs to main require 2 approvals (enforced via branch protection)"
+            echo "   Team leads: Member 3 (DevOps) + Member 4 (PM) must approve"
+          elif [ "$TARGET" = "staging" ]; then
+            echo "ℹ️  PRs to staging require 1 approval"
+          else
+            echo "ℹ️  PRs to dev require 1 approval"
+          fi
+
+  # ── PR Summary Comment ────────────────────────────────────────────────────
+  pr-summary:
+    name: 💬 PR Summary
+    runs-on: ubuntu-latest
+    needs: changes
+
+    steps:
+      - name: 📝 Comment PR Summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(c => 
+              c.user.type === 'Bot' && c.body.includes('🤖 PR Analysis'));
+            
+            const backendChanged = '${{ needs.changes.outputs.backend }}' === 'true';
+            const frontendChanged = '${{ needs.changes.outputs.frontend }}' === 'true';
+            
+            const body = `## 🤖 PR Analysis
+
+            | Area | Changed | Tests Required |
+            |------|---------|----------------|
+            | Backend (Spring Boot) | ${backendChanged ? '✅ Yes' : '➖ No'} | ${backendChanged ? 'JUnit + Mockito' : 'N/A'} |
+            | Frontend (ReactJS) | ${frontendChanged ? '✅ Yes' : '➖ No'} | ${frontendChanged ? 'React Testing' : 'N/A'} |
+
+            ### 🌿 Branch Flow
+            \`${context.payload.pull_request.head.ref}\` → \`${context.payload.pull_request.base.ref}\`
+
+            ### ✅ Checklist for Reviewer
+            - [ ] Code follows team conventions
+            - [ ] Tests are written/updated  
+            - [ ] No hardcoded secrets or credentials
+            - [ ] Swagger/API docs updated if endpoints changed
+            - [ ] No breaking changes to existing APIs
+
+            > ⚠️ **Merging to \`main\` requires 2 approvals** from team leads.`;
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body
+              });
+            }

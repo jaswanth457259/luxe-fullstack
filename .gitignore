@@ -1,0 +1,42 @@
+# ── Java / Spring Boot ────────────────────────────────────────────────────────
+target/
+*.jar
+*.war
+*.class
+*.log
+.mvn/wrapper/maven-wrapper.jar
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# ── Environment / Secrets (NEVER COMMIT THESE) ───────────────────────────────
+.env
+.env.local
+.env.*.local
+application-local.properties
+application-secrets.properties
+*-secrets.yml
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+docker/mysql-data/
+
+# ── Test / Coverage ───────────────────────────────────────────────────────────
+coverage/
+htmlcov/
+*.lcov
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+Thumbs.db
+.DS_Store

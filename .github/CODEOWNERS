@@ -1,0 +1,41 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CODEOWNERS — Defines who must review changes to each area
+# 4-Member Team:
+#   @member1_tba = Backend Lead
+#   @knssiriakshaya = Frontend Lead
+#   @member3_tba = DevOps/QA Lead
+#   @jaswanth457259 = Full Stack Lead / PM
+#
+# GitHub automatically requests reviews from these owners on PRs.
+# PRs to `main` require ALL matching owners to approve.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Default: All changes require review from Full Stack Lead ──────────────────
+*                               @jaswanth457259
+
+# ── Backend: Member 1 (Backend Lead) must review all Java/Spring changes ───────
+/backend/**                     @member1_tba @jaswanth457259
+/backend/src/main/java/**       @member1_tba
+/backend/src/test/**            @member1_tba @member3_tba
+/backend/pom.xml                @member1_tba @member3_tba
+/backend/Dockerfile             @member3_tba
+
+# ── Frontend: Member 2 (Frontend Lead) must review all React changes ───────────
+/frontend/**                    @knssiriakshaya @jaswanth457259
+/frontend/src/**                @knssiriakshaya
+/frontend/package.json          @knssiriakshaya @member3_tba
+/frontend/vercel.json           @knssiriakshaya @member3_tba
+
+# ── CI/CD & DevOps: Member 3 (DevOps) must review all infrastructure ───────────
+/.github/**                     @member3_tba @jaswanth457259
+/docker/**                      @member3_tba
+/scripts/**                     @member3_tba
+
+# ── Documentation: Any team member can update docs, PM reviews ─────────────────
+/docs/**                        @jaswanth457259
+/README.md                      @jaswanth457259
+
+# ── Security-sensitive files require DevOps + PM approval ──────────────────────
+/.github/workflows/deploy-production.yml    @member3_tba @jaswanth457259
+/backend/src/main/java/**/security/**       @member1_tba @member3_tba
+/backend/src/main/java/**/config/**         @member1_tba @member3_tba

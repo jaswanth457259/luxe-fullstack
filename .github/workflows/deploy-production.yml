@@ -1,0 +1,281 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# deploy-production.yml — Deploy to Production
+# Triggers: Push/merge to `main` branch
+# Deploys:  Backend → Railway Production | Frontend → Vercel Production
+# Strategy: Blue-green deployment with automatic rollback on failure
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: 🚀 Deploy — Production
+
+on:
+  push:
+    branches: [main]
+
+# Only one production deploy at a time — NEVER cancel in progress
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+env:
+  JAVA_VERSION: '17'
+  NODE_VERSION: '18'
+  REGISTRY: ghcr.io
+
+jobs:
+  # ── Pre-deploy checks ─────────────────────────────────────────────────────
+  pre-deploy-checks:
+    name: 🔍 Pre-Deploy Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: 🏷️ Generate Release Tag
+        id: tag
+        run: |
+          echo "VERSION=v$(date +'%Y.%m.%d')-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+          echo "TAG_NAME=release-$(date +'%Y%m%d-%H%M')" >> $GITHUB_OUTPUT
+
+      - name: 📋 Output Deploy Info
+        run: |
+          echo "🚀 Deploying to PRODUCTION"
+          echo "Version: ${{ steps.tag.outputs.VERSION }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "Branch: ${{ github.ref_name }}"
+
+  # ── Build and Push Production Docker Image ────────────────────────────────
+  build-production-image:
+    name: 🐳 Build Production Docker Image
+    runs-on: ubuntu-latest
+    needs: [pre-deploy-checks]
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: 📦 Maven Build (skip tests — ran in CI)
+        working-directory: ./backend
+        run: mvn package -DskipTests -q
+
+      - name: 🔑 Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏷️ Extract Docker Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/backend
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=prod-
+            type=raw,value=prod-{{date 'YYYY.MM.DD'}}
+
+      - name: 🐳 Build & Push Production Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            GIT_COMMIT=${{ github.sha }}
+
+  # ── Deploy Backend to Railway Production ──────────────────────────────────
+  deploy-backend-production:
+    name: 🚂 Deploy Backend → Railway Production
+    runs-on: ubuntu-latest
+    needs: [build-production-image]
+    environment:
+      name: production
+      url: https://luxe-api.railway.app
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🚂 Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: 🚀 Deploy to Railway Production
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up \
+            --service ${{ secrets.RAILWAY_SERVICE_ID_PROD }} \
+            --environment production \
+            --detach
+          echo "🚀 Deploying backend to production..."
+
+      - name: ⏳ Health Check with Auto Rollback
+        id: health-check
+        run: |
+          echo "Waiting for production backend health..."
+          for i in {1..40}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              https://luxe-api.railway.app/api/actuator/health || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Production backend is healthy!"
+              echo "healthy=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            echo "Attempt $i/40: HTTP $STATUS — waiting 15s..."
+            sleep 15
+          done
+          echo "healthy=false" >> $GITHUB_OUTPUT
+          echo "❌ Health check failed after 10 minutes"
+          exit 1
+
+      - name: ⏪ Auto Rollback on Failure
+        if: failure() && steps.health-check.outputs.healthy != 'true'
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          echo "🔴 Deploy failed! Initiating automatic rollback..."
+          railway rollback \
+            --service ${{ secrets.RAILWAY_SERVICE_ID_PROD }} \
+            --environment production
+          echo "🔄 Rollback complete."
+          exit 1
+
+  # ── Deploy Frontend to Vercel Production ──────────────────────────────────
+  deploy-frontend-production:
+    name: ⚛️  Deploy Frontend → Vercel Production
+    runs-on: ubuntu-latest
+    needs: [deploy-backend-production]
+    environment:
+      name: production
+      url: https://luxe.vercel.app
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 📦 Install Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: 🏗️ Build Production Frontend
+        working-directory: ./frontend
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: https://luxe-api.railway.app/api
+          VITE_ENV: production
+
+      - name: 🚀 Deploy to Vercel Production
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          working-directory: ./frontend
+
+  # ── Post-Deploy Smoke Tests ────────────────────────────────────────────────
+  post-deploy-tests:
+    name: 🧪 Production Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [deploy-backend-production, deploy-frontend-production]
+
+    steps:
+      - name: 🧪 Smoke Test Production
+        run: |
+          BASE="https://luxe-api.railway.app/api"
+
+          echo "1. Testing health endpoint..."
+          curl -sf "$BASE/actuator/health" | python3 -c \
+            "import sys,json; d=json.load(sys.stdin); assert d['status']=='UP', 'Health DOWN'"
+          echo "✅ Health check passed"
+
+          echo "2. Testing products endpoint..."
+          COUNT=$(curl -sf "$BASE/products" | python3 -c \
+            "import sys,json; d=json.load(sys.stdin); print(d['totalElements'])")
+          echo "✅ Products endpoint returned $COUNT items"
+
+          echo "3. Testing auth endpoint..."
+          TOKEN=$(curl -sf -X POST "$BASE/auth/login" \
+            -H "Content-Type: application/json" \
+            -d '{"email":"alex@luxe.com","password":"password"}' | \
+            python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+          [ -n "$TOKEN" ] && echo "✅ Auth works" || (echo "❌ Auth failed"; exit 1)
+
+          echo "4. Testing authenticated endpoint..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $TOKEN" "$BASE/users/me")
+          [ "$STATUS" = "200" ] && echo "✅ Auth guard works" || (echo "❌ Auth guard failed"; exit 1)
+
+          echo ""
+          echo "🎉 All production smoke tests PASSED!"
+
+  # ── Create GitHub Release ──────────────────────────────────────────────────
+  create-release:
+    name: 🏷️ Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [post-deploy-tests]
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📋 Generate Changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            CHANGES=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%an)" --no-merges)
+          else
+            CHANGES=$(git log --pretty=format:"- %s (%an)" --no-merges -20)
+          fi
+          echo "CHANGES<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: 🏷️ Create Release Tag & Notes
+        uses: ncipollo/release-action@v1
+        with:
+          tag: "v${{ github.run_number }}-${{ github.sha && github.sha[:7] || 'latest' }}"
+          name: "Production Release #${{ github.run_number }}"
+          body: |
+            ## 🚀 Production Deployment
+
+            **Deployed:** ${{ github.event.head_commit.timestamp }}
+            **By:** ${{ github.actor }}
+            **Commit:** ${{ github.sha }}
+
+            ### 📋 Changes
+            ${{ steps.changelog.outputs.CHANGES }}
+
+            ### 🌐 Live URLs
+            - Frontend: https://luxe.vercel.app
+            - API: https://luxe-api.railway.app/api
+            - Swagger: https://luxe-api.railway.app/api/swagger-ui.html
+          token: ${{ secrets.GITHUB_TOKEN }}
+          makeLatest: true
