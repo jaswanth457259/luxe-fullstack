@@ -27,10 +27,12 @@ public class OrderService {
         User user = getUser(email);
         List<CartItem> cartItems = cartItemRepository.findByUser(user);
 
-        if (cartItems.isEmpty()) throw new RuntimeException("Cart is empty");
+        if (cartItems.isEmpty())
+            throw new RuntimeException("Cart is empty");
 
         BigDecimal total = cartItems.stream()
-                .map(i -> i.getProduct().getPrice().multiply(BigDecimal.valueOf(i.getQuantity())))
+                .map(i -> i.getProduct().getPrice()
+                        .multiply(BigDecimal.valueOf(i.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         Order order = Order.builder()
@@ -41,42 +43,65 @@ public class OrderService {
                 .status(Order.OrderStatus.PENDING)
                 .build();
 
-        List<OrderItem> orderItems = cartItems.stream().map(cartItem -> OrderItem.builder()
-                .order(order)
-                .product(cartItem.getProduct())
-                .quantity(cartItem.getQuantity())
-                .price(cartItem.getProduct().getPrice())
-                .build()).collect(Collectors.toList());
+        List<OrderItem> orderItems = cartItems.stream()
+                .map(cartItem -> OrderItem.builder()
+                        .order(order)
+                        .product(cartItem.getProduct())
+                        .quantity(cartItem.getQuantity())
+                        .price(cartItem.getProduct().getPrice())
+                        .build())
+                .collect(Collectors.toList());
 
         order.setItems(orderItems);
+
         Order saved = orderRepository.save(order);
         cartItemRepository.deleteByUser(user);
+
         return mapToResponse(saved);
     }
 
+    @Transactional(readOnly = true)
     public Page<OrderDto.OrderResponse> getUserOrders(String email, Pageable pageable) {
         User user = getUser(email);
-        return orderRepository.findByUserOrderByCreatedAtDesc(user, pageable).map(this::mapToResponse);
+        return orderRepository
+                .findByUserOrderByCreatedAtDesc(user, pageable)
+                .map(this::mapToResponse);
     }
 
+    @Transactional(readOnly = true)
     public OrderDto.OrderResponse getOrderById(Long id, String email) {
-        Order order = orderRepository.findById(id).orElseThrow(() -> new RuntimeException("Order not found"));
+
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        // 🔒 Security Fix: ensure user can only see their own order
+        if (!order.getUser().getEmail().equals(email)) {
+            throw new RuntimeException("Access denied");
+        }
+
         return mapToResponse(order);
     }
 
+    @Transactional(readOnly = true)
     public Page<OrderDto.OrderResponse> getAllOrders(Pageable pageable) {
-        return orderRepository.findAllByOrderByCreatedAtDesc(pageable).map(this::mapToResponse);
+        return orderRepository
+                .findAllByOrderByCreatedAtDesc(pageable)
+                .map(this::mapToResponse);
     }
 
     @Transactional
     public OrderDto.OrderResponse updateOrderStatus(Long id, String status) {
-        Order order = orderRepository.findById(id).orElseThrow(() -> new RuntimeException("Order not found"));
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
         order.setStatus(Order.OrderStatus.valueOf(status.toUpperCase()));
+
         return mapToResponse(orderRepository.save(order));
     }
 
     private OrderDto.OrderResponse mapToResponse(Order order) {
         OrderDto.OrderResponse r = new OrderDto.OrderResponse();
+
         r.setId(order.getId());
         r.setStatus(order.getStatus().name());
         r.setTotalAmount(order.getTotalAmount());
@@ -84,6 +109,7 @@ public class OrderService {
         r.setPaymentMethod(order.getPaymentMethod());
         r.setTrackingNumber(order.getTrackingNumber());
         r.setCreatedAt(order.getCreatedAt());
+
         r.setItems(order.getItems().stream().map(item -> {
             OrderDto.OrderItemResponse ir = new OrderDto.OrderItemResponse();
             ir.setProductId(item.getProduct().getId());
@@ -93,6 +119,7 @@ public class OrderService {
             ir.setPrice(item.getPrice());
             return ir;
         }).collect(Collectors.toList()));
+
         return r;
     }
 
