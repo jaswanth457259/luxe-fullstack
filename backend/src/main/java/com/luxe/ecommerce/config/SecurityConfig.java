@@ -32,10 +32,10 @@ import java.util.List;
 public class SecurityConfig {
 
         private final UserRepository userRepository;
-        private final JwtAuthFilter jwtAuthFilter;
 
         @Bean
-        public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        public SecurityFilterChain securityFilterChain(HttpSecurity http,
+                        JwtAuthFilter jwtAuthFilter) throws Exception {
 
                 return http
                                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
