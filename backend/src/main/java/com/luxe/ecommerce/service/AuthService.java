@@ -36,12 +36,26 @@ public class AuthService {
     }
 
     public AuthDto.AuthResponse login(AuthDto.LoginRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
+
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getEmail(),
+                            request.getPassword()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        }
+
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
         String token = jwtUtil.generateToken(user.getEmail());
-        return new AuthDto.AuthResponse(token, user.getEmail(), user.getFullName(), user.getRole().name());
+
+        return new AuthDto.AuthResponse(
+                token,
+                user.getEmail(),
+                user.getFullName(),
+                user.getRole().name());
     }
 }
