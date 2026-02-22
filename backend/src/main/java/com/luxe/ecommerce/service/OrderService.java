@@ -21,19 +21,41 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final CartItemRepository cartItemRepository;
     private final UserRepository userRepository;
+    private final ProductRepository productRepository;
 
+    // ==============================
+    // PLACE ORDER (WITH STOCK LOGIC)
+    // ==============================
     @Transactional
     public OrderDto.OrderResponse placeOrder(String email, OrderDto.CreateOrderRequest request) {
+
         User user = getUser(email);
         List<CartItem> cartItems = cartItemRepository.findByUser(user);
 
         if (cartItems.isEmpty())
             throw new RuntimeException("Cart is empty");
 
-        BigDecimal total = cartItems.stream()
-                .map(i -> i.getProduct().getPrice()
-                        .multiply(BigDecimal.valueOf(i.getQuantity())))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal total = BigDecimal.ZERO;
+
+        // 🔒 Validate & Deduct Stock
+        for (CartItem cartItem : cartItems) {
+
+            Product product = cartItem.getProduct();
+
+            if (product.getStock() < cartItem.getQuantity()) {
+                throw new RuntimeException(
+                        "Not enough stock for product: " + product.getName());
+            }
+
+            // Deduct stock
+            product.setStock(product.getStock() - cartItem.getQuantity());
+            productRepository.save(product);
+
+            total = total.add(
+                    product.getPrice()
+                            .multiply(BigDecimal.valueOf(cartItem.getQuantity()))
+            );
+        }
 
         Order order = Order.builder()
                 .user(user)
@@ -55,11 +77,15 @@ public class OrderService {
         order.setItems(orderItems);
 
         Order saved = orderRepository.save(order);
+
         cartItemRepository.deleteByUser(user);
 
         return mapToResponse(saved);
     }
 
+    // ==============================
+    // USER ORDERS
+    // ==============================
     @Transactional(readOnly = true)
     public Page<OrderDto.OrderResponse> getUserOrders(String email, Pageable pageable) {
         User user = getUser(email);
@@ -74,7 +100,6 @@ public class OrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
-        // 🔒 Security Fix: ensure user can only see their own order
         if (!order.getUser().getEmail().equals(email)) {
             throw new RuntimeException("Access denied");
         }
@@ -82,6 +107,9 @@ public class OrderService {
         return mapToResponse(order);
     }
 
+    // ==============================
+    // ADMIN
+    // ==============================
     @Transactional(readOnly = true)
     public Page<OrderDto.OrderResponse> getAllOrders(Pageable pageable) {
         return orderRepository
@@ -91,15 +119,34 @@ public class OrderService {
 
     @Transactional
     public OrderDto.OrderResponse updateOrderStatus(Long id, String status) {
+
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
-        order.setStatus(Order.OrderStatus.valueOf(status.toUpperCase()));
+        Order.OrderStatus newStatus =
+                Order.OrderStatus.valueOf(status.toUpperCase());
+
+        // 🔄 If cancelling → restore stock
+        if (newStatus == Order.OrderStatus.CANCELLED &&
+                order.getStatus() != Order.OrderStatus.CANCELLED) {
+
+            for (OrderItem item : order.getItems()) {
+                Product product = item.getProduct();
+                product.setStock(product.getStock() + item.getQuantity());
+                productRepository.save(product);
+            }
+        }
+
+        order.setStatus(newStatus);
 
         return mapToResponse(orderRepository.save(order));
     }
 
+    // ==============================
+    // MAPPER
+    // ==============================
     private OrderDto.OrderResponse mapToResponse(Order order) {
+
         OrderDto.OrderResponse r = new OrderDto.OrderResponse();
 
         r.setId(order.getId());
