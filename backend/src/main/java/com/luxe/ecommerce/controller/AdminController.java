@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/admin")
+@RequestMapping("/admin")
 @PreAuthorize("hasRole('ADMIN')")
 @RequiredArgsConstructor
 public class AdminController {
@@ -29,7 +29,6 @@ public class AdminController {
                 "totalOrders", orderRepository.count(),
                 "pendingOrders", orderRepository.countByStatus(Order.OrderStatus.PENDING),
                 "shippedOrders", orderRepository.countByStatus(Order.OrderStatus.SHIPPED),
-                "deliveredOrders", orderRepository.countByStatus(Order.OrderStatus.DELIVERED)
-        ));
+                "deliveredOrders", orderRepository.countByStatus(Order.OrderStatus.DELIVERED)));
     }
 }
