@@ -18,17 +18,18 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
 
-        if (userRepository.findByRole(Role.ADMIN).isEmpty()) {
+        if (userRepository.count() == 0) {
 
             User admin = new User();
-            admin.setName("Admin");
+            admin.setFullName("Admin");
             admin.setEmail("admin@luxe.com");
             admin.setPassword(passwordEncoder.encode("Admin@123"));
             admin.setRole(Role.ADMIN);
+            admin.setEnabled(true);
 
             userRepository.save(admin);
 
-            System.out.println("✅ Default Admin Created");
+            System.out.println("🔥 DEFAULT ADMIN CREATED");
         }
     }
 }
