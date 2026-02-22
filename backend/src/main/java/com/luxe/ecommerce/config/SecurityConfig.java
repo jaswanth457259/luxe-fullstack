@@ -2,7 +2,6 @@ package com.luxe.ecommerce.config;
 
 import com.luxe.ecommerce.repository.UserRepository;
 import com.luxe.ecommerce.security.JwtAuthFilter;
-import com.luxe.ecommerce.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,12 +31,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-<<<<<<< HEAD
         private final UserRepository userRepository;
+        private final JwtAuthFilter jwtAuthFilter;
 
         @Bean
-        public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                        JwtAuthFilter jwtAuthFilter) throws Exception {
+        public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
                 return http
                                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -50,33 +48,23 @@ public class SecurityConfig {
                                                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                                                 .anyRequest().authenticated())
                                 .authenticationProvider(authenticationProvider())
-                                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                                .addFilterBefore(jwtAuthFilter,
+                                                UsernamePasswordAuthenticationFilter.class)
                                 .build();
-        }
-
-        @Bean
-        public JwtAuthFilter jwtAuthFilter(JwtUtil jwtUtil,
-                        UserDetailsService userDetailsService) {
-                return new JwtAuthFilter(jwtUtil, userDetailsService);
         }
 
         @Bean
         public CorsConfigurationSource corsConfigurationSource() {
 
                 CorsConfiguration config = new CorsConfiguration();
-
-                // ✅ FIXED: allows all Vercel URLs including preview URLs
                 config.setAllowedOriginPatterns(List.of("*"));
-
-                config.setAllowedMethods(List.of(
-                                "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-
+                config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
                 config.setAllowedHeaders(List.of("*"));
-                config.setExposedHeaders(List.of("Authorization"));
                 config.setAllowCredentials(true);
 
                 UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
                 source.registerCorsConfiguration("/**", config);
+
                 return source;
         }
 
@@ -110,84 +98,3 @@ public class SecurityConfig {
                 return new BCryptPasswordEncoder();
         }
 }
-=======
-    private final UserRepository userRepository;
-
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http,
-            JwtAuthFilter jwtAuthFilter) throws Exception {
-
-        return http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        // IMPORTANT: include /api prefix
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/products/**").permitAll()
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .anyRequest().authenticated())
-                .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter,
-                        UsernamePasswordAuthenticationFilter.class)
-                .build();
-    }
-
-    @Bean
-    public JwtAuthFilter jwtAuthFilter(JwtUtil jwtUtil,
-            UserDetailsService userDetailsService) {
-        return new JwtAuthFilter(jwtUtil, userDetailsService);
-    }
-
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-
-        CorsConfiguration config = new CorsConfiguration();
-
-        config.setAllowedOriginPatterns(List.of(
-                "https://*.vercel.app",
-                "http://localhost:5173"));
-
-        config.setAllowedMethods(List.of(
-                "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-
-        config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-
-        source.registerCorsConfiguration("/**", config);
-        return source;
-    }
-
-    @Bean
-    public UserDetailsService userDetailsService() {
-        return email -> userRepository.findByEmail(email)
-                .map(user -> org.springframework.security.core.userdetails.User.builder()
-                        .username(user.getEmail())
-                        .password(user.getPassword())
-                        .roles(user.getRole().name())
-                        .build())
-                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
-    }
-
-    @Bean
-    public AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(userDetailsService());
-        provider.setPasswordEncoder(passwordEncoder());
-        return provider;
-    }
-
-    @Bean
-    public AuthenticationManager authenticationManager(
-            AuthenticationConfiguration config) throws Exception {
-        return config.getAuthenticationManager();
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-}
->>>>>>> 687f5dc0bd8f40dd6f210b317445ed3c856bc526
