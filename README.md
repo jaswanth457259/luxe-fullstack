@@ -100,7 +100,7 @@ luxe-fullstack/
 
 ### One Command Setup
 ```bash
-git clone https://github.com/jaswanth457259/luxe-fullstack.git
+git clone https://github.com/jaswanth280505/luxe-fullstack.git
 cd luxe-fullstack
 chmod +x scripts/setup.sh
 ./scripts/setup.sh
