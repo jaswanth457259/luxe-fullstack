@@ -28,6 +28,8 @@ public class ProductDto {
     @PositiveOrZero
     private Integer stock;
 
+    private String mainImageUrl;
+
     private List<String> images;
 
     private String category;

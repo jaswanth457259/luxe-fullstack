@@ -2,6 +2,7 @@ package com.luxe.ecommerce.service;
 
 import com.luxe.ecommerce.dto.ProductDto;
 import com.luxe.ecommerce.model.Product;
+import com.luxe.ecommerce.model.ProductImage;
 import com.luxe.ecommerce.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -64,6 +65,7 @@ public class ProductService {
         product.setCategory(dto.getCategory());
         product.setBrand(dto.getBrand());
         product.setSku(dto.getSku());
+        product.setMainImageUrl(dto.getMainImageUrl());
         product.setActive(dto.isActive());
 
         if (dto.getImages() != null) {
@@ -77,6 +79,10 @@ public class ProductService {
                     .toList();
 
             product.setImages(images);
+
+            if ((product.getMainImageUrl() == null || product.getMainImageUrl().isBlank()) && !dto.getImages().isEmpty()) {
+                product.setMainImageUrl(dto.getImages().get(0));
+            }
         }
 
         return product;
