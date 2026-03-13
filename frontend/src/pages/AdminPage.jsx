@@ -93,7 +93,7 @@ export default function AdminPage() {
                   <tr key={p.id} className="border-t border-luxe-border hover:bg-luxe-dark/50 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <img src={p.imageUrl || `https://picsum.photos/seed/${p.id}/40/40`} alt={p.name} className="w-10 h-10 object-cover" />
+                        <img src={p.mainImageUrl || p.imageUrl || `https://picsum.photos/seed/${p.id}/40/40`} alt={p.name} className="w-10 h-10 object-cover" />
                         <span className="font-sans text-sm text-white line-clamp-1">{p.name}</span>
                       </div>
                     </td>

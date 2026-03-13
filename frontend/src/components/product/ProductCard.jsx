@@ -16,9 +16,11 @@ export default function ProductCard({ product }) {
 
   // get first image from images array
   const imageUrl =
-    product.images && product.images.length > 0
+    product.mainImageUrl ||
+    (product.images && product.images.length > 0
       ? product.images[0].imageUrl
-      : `https://picsum.photos/seed/${product.id}/400/500`;
+      : null) ||
+    `https://picsum.photos/seed/${product.id}/400/500`;
 
   const handleAddToCart = async (e) => {
     e.preventDefault();

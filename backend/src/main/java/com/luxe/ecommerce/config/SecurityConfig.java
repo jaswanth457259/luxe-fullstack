@@ -5,6 +5,7 @@ import com.luxe.ecommerce.security.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -43,10 +44,11 @@ public class SecurityConfig {
                                 .sessionManagement(session -> session
                                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                                 .authorizeHttpRequests(auth -> auth
-                                                .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**")
+                                                .requestMatchers(HttpMethod.OPTIONS, "/**")
                                                 .permitAll()
                                                 .requestMatchers("/api/auth/**", "/auth/**").permitAll()
-                                                .requestMatchers("/products/**").permitAll()
+                                                .requestMatchers(HttpMethod.GET, "/products/**", "/api/products/**")
+                                                .permitAll()
                                                 .requestMatchers("/orders/admin/**").hasRole("ADMIN")
                                                 .requestMatchers("/admin/**").hasRole("ADMIN")
                                                 .anyRequest().authenticated())

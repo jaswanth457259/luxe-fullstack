@@ -27,6 +27,8 @@ export default function ProductDetailPage() {
 
         if (r.data.images && r.data.images.length > 0) {
           setSelectedImage(r.data.images[0].imageUrl);
+        } else if (r.data.mainImageUrl) {
+          setSelectedImage(r.data.mainImageUrl);
         }
       })
       .catch(() => navigate('/products'))
@@ -77,6 +79,7 @@ export default function ProductDetailPage() {
 
   const mainImage =
     selectedImage ||
+    product.mainImageUrl ||
     product.images?.[0]?.imageUrl ||
     `https://picsum.photos/seed/${product.id}/600/700`;
 
