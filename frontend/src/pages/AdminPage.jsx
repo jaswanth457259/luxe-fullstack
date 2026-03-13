@@ -13,6 +13,7 @@ import {
   FiDownload,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import { getPrimaryProductImageUrl } from '../utils/productImages';
 
 function createInitialForm(product) {
   return {
@@ -257,7 +258,7 @@ export default function AdminPage() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <img
-                          src={product.mainImageUrl || `https://picsum.photos/seed/${product.id}/40/40`}
+                          src={getPrimaryProductImageUrl(product, '40/40')}
                           alt={product.name}
                           className="w-10 h-10 object-cover"
                         />

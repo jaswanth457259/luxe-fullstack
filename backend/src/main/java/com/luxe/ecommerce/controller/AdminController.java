@@ -31,7 +31,7 @@ public class AdminController {
     public ResponseEntity<Map<String, Object>> getDashboardStats() {
         return ResponseEntity.ok(Map.of(
                 "totalUsers", userRepository.count(),
-                "totalProducts", productRepository.count(),
+                "totalProducts", productRepository.countByActiveTrue(),
                 "totalOrders", orderRepository.count(),
                 "pendingOrders", orderRepository.countByStatus(Order.OrderStatus.PENDING),
                 "shippedOrders", orderRepository.countByStatus(Order.OrderStatus.SHIPPED),

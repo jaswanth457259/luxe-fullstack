@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { FiShoppingCart, FiArrowLeft, FiStar, FiPackage, FiTruck } from 'react-icons/fi';
+import { getPrimaryProductImageUrl, getProductImageUrls } from '../utils/productImages';
 
 export default function ProductDetailPage() {
 
@@ -24,12 +25,7 @@ export default function ProductDetailPage() {
     productApi.getById(id)
       .then(r => {
         setProduct(r.data);
-
-        if (r.data.images && r.data.images.length > 0) {
-          setSelectedImage(r.data.images[0].imageUrl);
-        } else if (r.data.mainImageUrl) {
-          setSelectedImage(r.data.mainImageUrl);
-        }
+        setSelectedImage(getPrimaryProductImageUrl(r.data, '600/700'));
       })
       .catch(() => navigate('/products'))
       .finally(() => setLoading(false));
@@ -77,11 +73,8 @@ export default function ProductDetailPage() {
       ? Math.round((1 - product.price / product.originalPrice) * 100)
       : null;
 
-  const mainImage =
-    selectedImage ||
-    product.mainImageUrl ||
-    product.images?.[0]?.imageUrl ||
-    `https://picsum.photos/seed/${product.id}/600/700`;
+  const galleryImages = getProductImageUrls(product);
+  const mainImage = selectedImage || getPrimaryProductImageUrl(product, '600/700');
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 page-enter">
@@ -97,15 +90,16 @@ export default function ProductDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16">
 
         {/* IMAGE SECTION */}
-        <div>
+        <div className="w-full max-w-xl mx-auto md:mx-0">
 
           {/* Main Image */}
           <div className="relative mb-4">
-            <div className="aspect-[4/5] bg-luxe-dark overflow-hidden">
+            <div className="aspect-[4/5] bg-luxe-dark overflow-hidden border border-luxe-border">
               <img
                 src={mainImage}
                 alt={product.name}
-                className="w-full h-full object-cover"
+                loading="eager"
+                className="w-full h-full object-cover object-center"
               />
             </div>
 
@@ -117,15 +111,17 @@ export default function ProductDetailPage() {
           </div>
 
           {/* THUMBNAILS */}
-          {product.images && product.images.length > 1 && (
-            <div className="flex gap-3">
-              {product.images.map((img, index) => (
+          {galleryImages.length > 1 && (
+            <div className="flex flex-wrap gap-3">
+              {galleryImages.map((imageUrl, index) => (
                 <img
                   key={index}
-                  src={img.imageUrl}
-                  onClick={() => setSelectedImage(img.imageUrl)}
-                  className={`w-20 h-20 object-cover cursor-pointer border 
-                  ${selectedImage === img.imageUrl ? 'border-gold-500' : 'border-luxe-border'}
+                  src={imageUrl}
+                  alt={`${product.name} view ${index + 1}`}
+                  loading="lazy"
+                  onClick={() => setSelectedImage(imageUrl)}
+                  className={`w-16 h-16 sm:w-20 sm:h-20 object-cover object-center cursor-pointer border 
+                  ${mainImage === imageUrl ? 'border-gold-500' : 'border-luxe-border'}
                   hover:border-gold-500`}
                 />
               ))}

@@ -25,16 +25,18 @@ public class CartService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
 
+    @Transactional
     public CartDto.CartResponse getCart(String email) {
         User user = getUser(email);
         List<CartItem> items = cartItemRepository.findByUser(user);
-        return buildCartResponse(items);
+        List<CartItem> activeItems = pruneInactiveItems(items);
+        return buildCartResponse(activeItems);
     }
 
     @Transactional
     public CartDto.CartResponse addToCart(String email, CartDto.CartItemRequest request) {
         User user = getUser(email);
-        Product product = productRepository.findById(request.getProductId())
+        Product product = productRepository.findByIdAndActiveTrue(request.getProductId())
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
         Optional<CartItem> existing = cartItemRepository.findByUserAndProduct(user, product);
@@ -54,6 +56,10 @@ public class CartService {
     public CartDto.CartResponse updateCartItem(String email, Long itemId, Integer quantity) {
         CartItem item = cartItemRepository.findById(itemId)
                 .orElseThrow(() -> new RuntimeException("Cart item not found"));
+        if (!item.getProduct().isActive()) {
+            cartItemRepository.delete(item);
+            return getCart(email);
+        }
         if (quantity <= 0) {
             cartItemRepository.delete(item);
         } else {
@@ -67,6 +73,20 @@ public class CartService {
     public void clearCart(String email) {
         User user = getUser(email);
         cartItemRepository.deleteByUser(user);
+    }
+
+    private List<CartItem> pruneInactiveItems(List<CartItem> items) {
+        List<CartItem> inactiveItems = items.stream()
+                .filter(item -> !item.getProduct().isActive())
+                .collect(Collectors.toList());
+
+        if (!inactiveItems.isEmpty()) {
+            inactiveItems.forEach(cartItemRepository::delete);
+        }
+
+        return items.stream()
+                .filter(item -> item.getProduct().isActive())
+                .collect(Collectors.toList());
     }
 
     private CartDto.CartResponse buildCartResponse(List<CartItem> items) {

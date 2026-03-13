@@ -7,9 +7,13 @@ import com.luxe.ecommerce.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -39,7 +43,7 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public Product getById(Long id) {
-        return prepareProductForResponse(findProductEntity(id));
+        return prepareProductForResponse(findActiveProductEntity(id));
     }
 
     public List<String> getAllCategories() {
@@ -86,7 +90,12 @@ public class ProductService {
 
     private Product findProductEntity(Long id) {
         return productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
+    }
+
+    private Product findActiveProductEntity(Long id) {
+        return productRepository.findByIdAndActiveTrue(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
     }
 
     private Product mapToEntity(ProductDto dto, Product product) {
@@ -99,7 +108,7 @@ public class ProductService {
         product.setCategory(dto.getCategory());
         product.setBrand(dto.getBrand());
         product.setSku(dto.getSku() == null ? null : dto.getSku().trim());
-        product.setMainImageUrl(dto.getMainImageUrl());
+        product.setMainImageUrl(dto.getMainImageUrl() == null ? null : dto.getMainImageUrl().trim());
         product.setActive(dto.isActive());
         if (dto.getRating() != null) {
             product.setRating(dto.getRating());
@@ -109,11 +118,10 @@ public class ProductService {
         }
 
         if (dto.getImages() != null) {
+            List<String> normalizedImageUrls = normalizeImageUrls(product.getMainImageUrl(), dto.getImages());
 
-            List<ProductImage> images = dto.getImages()
+            List<ProductImage> images = normalizedImageUrls
                     .stream()
-                    .map(url -> url == null ? null : url.trim())
-                    .filter(url -> url != null && !url.isBlank())
                     .map(url -> ProductImage.builder()
                             .imageUrl(url)
                             .product(product)
@@ -128,6 +136,23 @@ public class ProductService {
         }
 
         return product;
+    }
+
+    private List<String> normalizeImageUrls(String mainImageUrl, List<String> rawImages) {
+        LinkedHashSet<String> orderedUrls = new LinkedHashSet<>();
+
+        if (mainImageUrl != null && !mainImageUrl.isBlank()) {
+            orderedUrls.add(mainImageUrl.trim());
+        }
+
+        if (rawImages != null) {
+            rawImages.stream()
+                    .map(url -> url == null ? null : url.trim())
+                    .filter(url -> url != null && !url.isBlank())
+                    .forEach(orderedUrls::add);
+        }
+
+        return new ArrayList<>(orderedUrls);
     }
 
     private Product prepareProductForResponse(Product product) {

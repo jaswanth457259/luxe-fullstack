@@ -4,6 +4,7 @@ import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import { getPrimaryProductImageUrl } from '../../utils/productImages';
 
 export default function ProductCard({ product }) {
   const { addToCart } = useCart();
@@ -15,12 +16,7 @@ export default function ProductCard({ product }) {
     : null;
 
   // get first image from images array
-  const imageUrl =
-    product.mainImageUrl ||
-    (product.images && product.images.length > 0
-      ? product.images[0].imageUrl
-      : null) ||
-    `https://picsum.photos/seed/${product.id}/400/500`;
+  const imageUrl = getPrimaryProductImageUrl(product);
 
   const handleAddToCart = async (e) => {
     e.preventDefault();
@@ -55,7 +51,8 @@ export default function ProductCard({ product }) {
           <img
             src={imageUrl}
             alt={product.name}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            loading="lazy"
+            className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
           />
 
           {discount && (

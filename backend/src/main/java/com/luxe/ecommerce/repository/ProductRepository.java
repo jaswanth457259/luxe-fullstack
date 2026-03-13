@@ -16,6 +16,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Page<Product> findByCategoryAndActiveTrue(String category, Pageable pageable);
 
+    Optional<Product> findByIdAndActiveTrue(Long id);
+
     @Query("SELECT p FROM Product p WHERE p.active = true AND " +
             "(LOWER(p.name) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
             "LOWER(p.description) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
@@ -29,4 +31,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<String> findAllCategories();
 
     Optional<Product> findBySku(String sku);
+
+    long countByActiveTrue();
 }

@@ -42,6 +42,10 @@ public class OrderService {
 
             Product product = cartItem.getProduct();
 
+            if (!product.isActive()) {
+                throw new RuntimeException("Product is no longer available: " + product.getName());
+            }
+
             if (product.getStock() < cartItem.getQuantity()) {
                 throw new RuntimeException(
                         "Not enough stock for product: " + product.getName());
