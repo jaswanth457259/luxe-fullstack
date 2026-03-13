@@ -45,10 +45,10 @@ public class SecurityConfig {
                                 .authorizeHttpRequests(auth -> auth
                                                 .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**")
                                                 .permitAll()
-                                                .requestMatchers("/auth/**").permitAll()
-                                                .requestMatchers("/products/**").permitAll()
-                                                .requestMatchers("/orders/admin/**").hasRole("ADMIN")
-                                                .requestMatchers("/admin/**").hasRole("ADMIN")
+                                                .requestMatchers("/api/auth/**").permitAll()
+                                                .requestMatchers("/api/products/**").permitAll()
+                                                .requestMatchers("/api/orders/admin/**").hasRole("ADMIN")
+                                                .requestMatchers("/api/admin/**").hasRole("ADMIN")
                                                 .anyRequest().authenticated())
                                 .authenticationProvider(authenticationProvider())
                                 .addFilterBefore(jwtAuthFilter,
