@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -17,21 +18,29 @@ public class ProductService {
 
     private final ProductRepository productRepository;
 
+    @Transactional(readOnly = true)
     public Page<Product> getAllProducts(Pageable pageable) {
-        return productRepository.findByActiveTrue(pageable);
+        return productRepository.findByActiveTrue(pageable)
+                .map(this::prepareProductForResponse);
     }
 
+    @Transactional(readOnly = true)
     public Page<Product> getByCategory(String category, Pageable pageable) {
-        return productRepository.findByCategoryAndActiveTrue(category, pageable);
+        return productRepository.findByCategoryAndActiveTrue(category, pageable)
+                .map(this::prepareProductForResponse);
     }
 
+    @Transactional(readOnly = true)
     public Page<Product> searchProducts(String query, Pageable pageable) {
-        return productRepository.searchProducts(query, pageable);
+        return productRepository.searchProducts(query, pageable)
+                .map(this::prepareProductForResponse);
     }
 
+    @Transactional(readOnly = true)
     public Product getById(Long id) {
-        return productRepository.findById(id)
+        Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
+        return prepareProductForResponse(product);
     }
 
     public List<String> getAllCategories() {
@@ -82,6 +91,19 @@ public class ProductService {
 
             if ((product.getMainImageUrl() == null || product.getMainImageUrl().isBlank()) && !dto.getImages().isEmpty()) {
                 product.setMainImageUrl(dto.getImages().get(0));
+            }
+        }
+
+        return product;
+    }
+
+    private Product prepareProductForResponse(Product product) {
+        if (product.getImages() != null) {
+            product.getImages().size();
+
+            if ((product.getMainImageUrl() == null || product.getMainImageUrl().isBlank())
+                    && !product.getImages().isEmpty()) {
+                product.setMainImageUrl(product.getImages().get(0).getImageUrl());
             }
         }
 
