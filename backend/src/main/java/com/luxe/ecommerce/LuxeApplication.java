@@ -1,5 +1,6 @@
 package com.luxe.ecommerce;
 
+import com.luxe.ecommerce.model.Role;
 import com.luxe.ecommerce.model.User;
 import com.luxe.ecommerce.repository.UserRepository;
 import org.springframework.boot.CommandLineRunner;
@@ -19,19 +20,15 @@ public class LuxeApplication {
     CommandLineRunner initAdmin(UserRepository userRepository,
             PasswordEncoder passwordEncoder) {
         return args -> {
-
             if (userRepository.count() == 0) {
-
                 User admin = new User();
                 admin.setFullName("Admin");
                 admin.setEmail("admin@luxe.com");
                 admin.setPassword(passwordEncoder.encode("Admin@123"));
-                admin.setRole(User.Role.ADMIN); // ✅ FIXED
+                admin.setRole(Role.ADMIN);
                 admin.setEnabled(true);
 
                 userRepository.save(admin);
-
-                System.out.println("🔥 ADMIN CREATED SUCCESSFULLY");
             }
         };
     }

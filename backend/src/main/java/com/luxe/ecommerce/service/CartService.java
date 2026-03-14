@@ -3,6 +3,7 @@ package com.luxe.ecommerce.service;
 import com.luxe.ecommerce.dto.CartDto;
 import com.luxe.ecommerce.model.CartItem;
 import com.luxe.ecommerce.model.Product;
+import com.luxe.ecommerce.model.ProductApprovalStatus;
 import com.luxe.ecommerce.model.User;
 import com.luxe.ecommerce.repository.CartItemRepository;
 import com.luxe.ecommerce.repository.ProductRepository;
@@ -36,7 +37,7 @@ public class CartService {
     @Transactional
     public CartDto.CartResponse addToCart(String email, CartDto.CartItemRequest request) {
         User user = getUser(email);
-        Product product = productRepository.findByIdAndActiveTrue(request.getProductId())
+        Product product = productRepository.findPublicById(request.getProductId())
                 .orElseThrow(() -> new RuntimeException("Product not found"));
 
         Optional<CartItem> existing = cartItemRepository.findByUserAndProduct(user, product);
@@ -56,7 +57,7 @@ public class CartService {
     public CartDto.CartResponse updateCartItem(String email, Long itemId, Integer quantity) {
         CartItem item = cartItemRepository.findById(itemId)
                 .orElseThrow(() -> new RuntimeException("Cart item not found"));
-        if (!item.getProduct().isActive()) {
+        if (!isPurchasable(item.getProduct())) {
             cartItemRepository.delete(item);
             return getCart(email);
         }
@@ -77,7 +78,7 @@ public class CartService {
 
     private List<CartItem> pruneInactiveItems(List<CartItem> items) {
         List<CartItem> inactiveItems = items.stream()
-                .filter(item -> !item.getProduct().isActive())
+                .filter(item -> !isPurchasable(item.getProduct()))
                 .collect(Collectors.toList());
 
         if (!inactiveItems.isEmpty()) {
@@ -85,7 +86,7 @@ public class CartService {
         }
 
         return items.stream()
-                .filter(item -> item.getProduct().isActive())
+                .filter(item -> isPurchasable(item.getProduct()))
                 .collect(Collectors.toList());
     }
 
@@ -116,5 +117,10 @@ public class CartService {
     private User getUser(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+    }
+
+    private boolean isPurchasable(Product product) {
+        return product.isActive()
+                && (product.getApprovalStatus() == null || product.getApprovalStatus() == ProductApprovalStatus.APPROVED);
     }
 }

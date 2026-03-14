@@ -40,4 +40,11 @@ public class ProductDto {
 
     private Double rating;
     private Integer reviewCount;
+
+    private String approvalStatus;
+    private Integer aiReviewScore;
+    private String aiReviewSummary;
+    private List<String> aiReviewIssues;
+    private String aiRecommendation;
+    private String adminNotes;
 }

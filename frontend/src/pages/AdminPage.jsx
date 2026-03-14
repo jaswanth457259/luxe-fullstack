@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { adminApi, productApi, orderApi } from '../services/api';
 import {
+  FiCheckCircle,
   FiPackage,
   FiUsers,
   FiShoppingBag,
@@ -8,7 +9,10 @@ import {
   FiPlus,
   FiEdit2,
   FiTrash2,
+  FiShield,
+  FiSend,
   FiX,
+  FiXCircle,
   FiUpload,
   FiDownload,
 } from 'react-icons/fi';
@@ -38,11 +42,44 @@ function parseImagesInput(value) {
     .filter(Boolean);
 }
 
+function getStatusClasses(status) {
+  switch (status) {
+    case 'APPROVED':
+      return 'bg-green-500/10 text-green-500';
+    case 'PENDING_REVIEW':
+      return 'bg-yellow-500/10 text-yellow-400';
+    case 'REJECTED':
+      return 'bg-red-500/10 text-red-400';
+    default:
+      return 'bg-gray-500/10 text-gray-400';
+  }
+}
+
+function ReviewIssues({ issues }) {
+  if (!issues?.length) {
+    return <p className="font-sans text-sm text-gray-400">No AI issues listed.</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      {issues.map((issue, index) => (
+        <div key={`${issue}-${index}`} className="font-sans text-sm text-gray-300">
+          {issue}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [tab, setTab] = useState('dashboard');
   const [stats, setStats] = useState({});
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [sellerReviews, setSellerReviews] = useState([]);
+  const [productReviews, setProductReviews] = useState([]);
+  const [sellerNotes, setSellerNotes] = useState({});
+  const [productNotes, setProductNotes] = useState({});
   const [showProductForm, setShowProductForm] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
   const [importing, setImporting] = useState(false);
@@ -64,10 +101,22 @@ export default function AdminPage() {
     setOrders(response.data.content || []);
   };
 
+  const loadSellerReviews = async () => {
+    const response = await adminApi.getPendingSellerReviews({ page: 0, size: 50 });
+    setSellerReviews(response.data.content || []);
+  };
+
+  const loadProductReviews = async () => {
+    const response = await adminApi.getPendingProductReviews({ page: 0, size: 50 });
+    setProductReviews(response.data.content || []);
+  };
+
   useEffect(() => {
     loadStats().catch(() => {});
     loadProducts().catch(() => {});
     loadOrders().catch(() => {});
+    loadSellerReviews().catch(() => {});
+    loadProductReviews().catch(() => {});
   }, []);
 
   const handleImportClick = () => {
@@ -119,8 +168,31 @@ export default function AdminPage() {
     }
   };
 
+  const handleSellerDecision = async (sellerId, approved) => {
+    try {
+      await adminApi.reviewSeller(sellerId, { approved, adminNotes: sellerNotes[sellerId] || '' });
+      setSellerReviews((current) => current.filter((item) => item.id !== sellerId));
+      await loadStats();
+      toast.success(approved ? 'Seller approved' : 'Seller rejected');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update seller review');
+    }
+  };
+
+  const handleProductDecision = async (productId, approved) => {
+    try {
+      await adminApi.reviewProduct(productId, { approved, adminNotes: productNotes[productId] || '' });
+      setProductReviews((current) => current.filter((item) => item.id !== productId));
+      await Promise.all([loadStats(), loadProducts()]);
+      toast.success(approved ? 'Product approved' : 'Product rejected');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update product review');
+    }
+  };
+
   const statCards = [
     { icon: FiUsers, label: 'Total Users', value: stats.totalUsers, color: 'text-blue-400', bg: 'bg-blue-400/10' },
+    { icon: FiShield, label: 'Sellers', value: stats.totalSellers, color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
     { icon: FiPackage, label: 'Products', value: stats.totalProducts, color: 'text-purple-400', bg: 'bg-purple-400/10' },
     { icon: FiShoppingBag, label: 'Total Orders', value: stats.totalOrders, color: 'text-gold-500', bg: 'bg-gold-500/10' },
     { icon: FiTrendingUp, label: 'Delivered', value: stats.deliveredOrders, color: 'text-green-500', bg: 'bg-green-500/10' },
@@ -135,15 +207,21 @@ export default function AdminPage() {
         </div>
       </div>
 
-      <div className="flex gap-1 mb-8 border-b border-luxe-border">
-        {['dashboard', 'products', 'orders'].map((tabName) => (
+      <div className="flex gap-1 mb-8 border-b border-luxe-border overflow-x-auto">
+        {[
+          ['dashboard', 'Dashboard'],
+          ['seller-reviews', 'Seller Reviews'],
+          ['product-reviews', 'Product Reviews'],
+          ['products', 'Products'],
+          ['orders', 'Orders'],
+        ].map(([tabName, label]) => (
           <button
             key={tabName}
             onClick={() => setTab(tabName)}
-            className={`px-5 py-3 font-sans text-xs tracking-widest uppercase transition-colors border-b-2 -mb-px
+            className={`px-5 py-3 whitespace-nowrap font-sans text-xs tracking-widest uppercase transition-colors border-b-2 -mb-px
               ${tab === tabName ? 'border-gold-500 text-gold-500' : 'border-transparent text-gray-500 hover:text-white'}`}
           >
-            {tabName}
+            {label}
           </button>
         ))}
       </div>
@@ -162,11 +240,12 @@ export default function AdminPage() {
             ))}
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { label: 'Pending', value: stats.pendingOrders, color: 'text-yellow-500' },
+              { label: 'Pending Sellers', value: stats.pendingSellerApplications, color: 'text-yellow-500' },
+              { label: 'Pending Products', value: stats.pendingProductReviews, color: 'text-blue-400' },
+              { label: 'Pending Orders', value: stats.pendingOrders, color: 'text-orange-400' },
               { label: 'Shipped', value: stats.shippedOrders, color: 'text-purple-400' },
-              { label: 'Delivered', value: stats.deliveredOrders, color: 'text-green-500' },
             ].map((item) => (
               <div key={item.label} className="card-luxe p-5 text-center">
                 <p className={`font-display text-4xl ${item.color}`}>{item.value ?? 0}</p>
@@ -174,6 +253,176 @@ export default function AdminPage() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {tab === 'seller-reviews' && (
+        <div className="space-y-4">
+          {sellerReviews.map((seller) => (
+            <div key={seller.id} className="card-luxe p-6">
+              <div className="flex flex-col xl:flex-row gap-6">
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <h2 className="font-display text-2xl text-white">{seller.businessName || seller.fullName}</h2>
+                      <span className={`font-sans text-xs px-2 py-1 rounded-sm ${getStatusClasses(seller.status)}`}>
+                        {seller.status?.replaceAll('_', ' ')}
+                      </span>
+                    </div>
+                    <p className="font-sans text-sm text-gray-400">{seller.fullName} · {seller.email}</p>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4 text-sm font-sans text-gray-300">
+                    <div>
+                      <p className="text-xs tracking-widest uppercase text-gray-500 mb-1">Business Type</p>
+                      <p>{seller.businessType || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs tracking-widest uppercase text-gray-500 mb-1">Tax ID</p>
+                      <p>{seller.taxId || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs tracking-widest uppercase text-gray-500 mb-1">Website</p>
+                      <p>{seller.website || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs tracking-widest uppercase text-gray-500 mb-1">Document</p>
+                      <p>{seller.documentUrl || 'Not provided'}</p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <p className="text-xs tracking-widest uppercase text-gray-500 mb-1">Description</p>
+                      <p>{seller.description || 'Not provided'}</p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <p className="text-xs tracking-widest uppercase text-gray-500 mb-1">Address</p>
+                      <p>{seller.address || 'Not provided'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="w-full xl:max-w-md space-y-4">
+                  <div className="bg-luxe-dark border border-luxe-border p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="font-sans text-xs tracking-widest uppercase text-gold-500">AI Review</p>
+                      <p className="font-display text-2xl text-white">{seller.aiReviewScore ?? '--'}</p>
+                    </div>
+                    <p className="font-sans text-sm text-gray-300 mb-3">{seller.aiReviewSummary || 'No AI summary yet'}</p>
+                    <ReviewIssues issues={seller.aiReviewIssues} />
+                    <p className="font-sans text-xs tracking-widest uppercase text-gray-500 mt-4 mb-1">Recommendation</p>
+                    <p className="font-sans text-sm text-white">{seller.aiRecommendation || 'Not available'}</p>
+                  </div>
+
+                  <textarea
+                    value={sellerNotes[seller.id] || ''}
+                    onChange={(event) => setSellerNotes((current) => ({ ...current, [seller.id]: event.target.value }))}
+                    rows={3}
+                    placeholder="Admin notes for the seller..."
+                    className="input-luxe resize-none"
+                  />
+
+                  <div className="flex gap-3">
+                    <button onClick={() => handleSellerDecision(seller.id, true)} className="btn-gold flex-1 flex items-center justify-center gap-2">
+                      <FiCheckCircle size={14} /> Approve
+                    </button>
+                    <button onClick={() => handleSellerDecision(seller.id, false)} className="btn-outline flex-1 flex items-center justify-center gap-2 text-red-400 border-red-500/40 hover:border-red-500">
+                      <FiXCircle size={14} /> Reject
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {sellerReviews.length === 0 && (
+            <div className="card-luxe p-12 text-center">
+              <p className="font-display text-2xl text-white mb-2">No seller reviews waiting</p>
+              <p className="font-sans text-sm text-gray-500">New seller submissions will appear here with AI feedback.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'product-reviews' && (
+        <div className="space-y-4">
+          {productReviews.map((product) => (
+            <div key={product.id} className="card-luxe p-6">
+              <div className="flex flex-col xl:flex-row gap-6">
+                <div className="flex-1 space-y-4">
+                  <div className="flex items-start gap-4">
+                    <img
+                      src={getPrimaryProductImageUrl(product, '80/80')}
+                      alt={product.name}
+                      className="w-20 h-20 object-cover border border-luxe-border"
+                    />
+                    <div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <h2 className="font-display text-2xl text-white">{product.name}</h2>
+                        <span className={`font-sans text-xs px-2 py-1 rounded-sm ${getStatusClasses(product.approvalStatus)}`}>
+                          {product.approvalStatus?.replaceAll('_', ' ')}
+                        </span>
+                      </div>
+                      <p className="font-sans text-sm text-gray-400">{product.sellerName || 'Seller'} · {product.sellerEmail || 'No email'}</p>
+                      <p className="font-sans text-sm text-gray-500 mt-1">{product.brand || 'No brand'} · {product.category || 'No category'}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <div className="bg-luxe-dark border border-luxe-border p-4">
+                      <p className="font-sans text-xs tracking-widest uppercase text-gray-500 mb-1">Price</p>
+                      <p className="font-display text-2xl text-white">Rs {product.price?.toLocaleString('en-IN')}</p>
+                    </div>
+                    <div className="bg-luxe-dark border border-luxe-border p-4">
+                      <p className="font-sans text-xs tracking-widest uppercase text-gray-500 mb-1">Stock</p>
+                      <p className="font-display text-2xl text-white">{product.stock}</p>
+                    </div>
+                    <div className="bg-luxe-dark border border-luxe-border p-4">
+                      <p className="font-sans text-xs tracking-widest uppercase text-gray-500 mb-1">AI Score</p>
+                      <p className="font-display text-2xl text-white">{product.aiReviewScore ?? '--'}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="font-sans text-xs tracking-widest uppercase text-gray-500 mb-1">Description</p>
+                    <p className="font-sans text-sm text-gray-300">{product.description || 'No description provided'}</p>
+                  </div>
+                </div>
+
+                <div className="w-full xl:max-w-md space-y-4">
+                  <div className="bg-luxe-dark border border-luxe-border p-4">
+                    <p className="font-sans text-xs tracking-widest uppercase text-gold-500 mb-2">AI Review Summary</p>
+                    <p className="font-sans text-sm text-gray-300 mb-3">{product.aiReviewSummary || 'No AI summary yet'}</p>
+                    <ReviewIssues issues={product.aiReviewIssues} />
+                    <p className="font-sans text-xs tracking-widest uppercase text-gray-500 mt-4 mb-1">Recommendation</p>
+                    <p className="font-sans text-sm text-white">{product.aiRecommendation || 'Not available'}</p>
+                  </div>
+
+                  <textarea
+                    value={productNotes[product.id] || ''}
+                    onChange={(event) => setProductNotes((current) => ({ ...current, [product.id]: event.target.value }))}
+                    rows={3}
+                    placeholder="Admin notes for the seller..."
+                    className="input-luxe resize-none"
+                  />
+
+                  <div className="flex gap-3">
+                    <button onClick={() => handleProductDecision(product.id, true)} className="btn-gold flex-1 flex items-center justify-center gap-2">
+                      <FiCheckCircle size={14} /> Approve
+                    </button>
+                    <button onClick={() => handleProductDecision(product.id, false)} className="btn-outline flex-1 flex items-center justify-center gap-2 text-red-400 border-red-500/40 hover:border-red-500">
+                      <FiXCircle size={14} /> Reject
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {productReviews.length === 0 && (
+            <div className="card-luxe p-12 text-center">
+              <p className="font-display text-2xl text-white mb-2">No product submissions waiting</p>
+              <p className="font-sans text-sm text-gray-500">Seller product submissions will appear here with AI feedback.</p>
+            </div>
+          )}
         </div>
       )}
 

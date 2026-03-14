@@ -3,8 +3,6 @@ package com.luxe.ecommerce.model;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
 
 @Entity
 @Table(name = "users")
@@ -47,6 +45,4 @@ public class User {
 
     @PreUpdate
     protected void onUpdate() { updatedAt = LocalDateTime.now(); }
-
-    public enum Role { USER, ADMIN }
 }

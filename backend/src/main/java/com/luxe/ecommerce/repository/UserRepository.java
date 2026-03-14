@@ -1,5 +1,6 @@
 package com.luxe.ecommerce.repository;
 
+import com.luxe.ecommerce.model.Role;
 import com.luxe.ecommerce.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -13,5 +14,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByEmail(String email);
 
-    Optional<User> findByRole(User.Role role); // ✅ FIXED
+    Optional<User> findByRole(Role role);
+
+    long countByRole(Role role);
 }

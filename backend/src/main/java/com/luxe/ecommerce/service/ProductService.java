@@ -2,6 +2,7 @@ package com.luxe.ecommerce.service;
 
 import com.luxe.ecommerce.dto.ProductDto;
 import com.luxe.ecommerce.model.Product;
+import com.luxe.ecommerce.model.ProductApprovalStatus;
 import com.luxe.ecommerce.model.ProductImage;
 import com.luxe.ecommerce.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,13 +26,13 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public Page<Product> getAllProducts(Pageable pageable) {
-        return productRepository.findByActiveTrue(pageable)
+        return productRepository.findPublicProducts(pageable)
                 .map(this::prepareProductForResponse);
     }
 
     @Transactional(readOnly = true)
     public Page<Product> getByCategory(String category, Pageable pageable) {
-        return productRepository.findByCategoryAndActiveTrue(category, pageable)
+        return productRepository.findPublicProductsByCategory(category, pageable)
                 .map(this::prepareProductForResponse);
     }
 
@@ -43,7 +44,7 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public Product getById(Long id) {
-        return prepareProductForResponse(findActiveProductEntity(id));
+        return prepareProductForResponse(findPublicProductEntity(id));
     }
 
     public List<String> getAllCategories() {
@@ -52,14 +53,18 @@ public class ProductService {
 
     @Transactional
     public Product createProduct(ProductDto dto) {
-        Product product = mapToEntity(dto, new Product());
+        Product product = applyProductDetails(dto, new Product());
+        product.setApprovalStatus(ProductApprovalStatus.APPROVED);
+        product.setSubmittedAt(null);
+        product.setReviewedAt(null);
         return prepareProductForResponse(productRepository.save(product));
     }
 
     @Transactional
     public Product updateProduct(Long id, ProductDto dto) {
         Product product = findProductEntity(id);
-        mapToEntity(dto, product);
+        applyProductDetails(dto, product);
+        product.setApprovalStatus(ProductApprovalStatus.APPROVED);
         return prepareProductForResponse(productRepository.save(product));
     }
 
@@ -77,7 +82,8 @@ public class ProductService {
             product = new Product();
         }
 
-        mapToEntity(dto, product);
+        applyProductDetails(dto, product);
+        product.setApprovalStatus(ProductApprovalStatus.APPROVED);
         productRepository.save(product);
         return created;
     }
@@ -88,18 +94,17 @@ public class ProductService {
         product.setActive(false);
     }
 
-    private Product findProductEntity(Long id) {
+    Product findProductEntity(Long id) {
         return productRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
     }
 
-    private Product findActiveProductEntity(Long id) {
-        return productRepository.findByIdAndActiveTrue(id)
+    Product findPublicProductEntity(Long id) {
+        return productRepository.findPublicById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
     }
 
-    private Product mapToEntity(ProductDto dto, Product product) {
-
+    public Product applyProductDetails(ProductDto dto, Product product) {
         product.setName(dto.getName());
         product.setDescription(dto.getDescription());
         product.setPrice(dto.getPrice());
@@ -155,7 +160,7 @@ public class ProductService {
         return new ArrayList<>(orderedUrls);
     }
 
-    private Product prepareProductForResponse(Product product) {
+    public Product prepareProductForResponse(Product product) {
         if (product.getImages() != null) {
             product.getImages().size();
 

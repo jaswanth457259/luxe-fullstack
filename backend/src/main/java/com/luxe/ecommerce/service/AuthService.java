@@ -1,7 +1,11 @@
 package com.luxe.ecommerce.service;
 
 import com.luxe.ecommerce.dto.AuthDto;
+import com.luxe.ecommerce.model.Role;
+import com.luxe.ecommerce.model.SellerApprovalStatus;
+import com.luxe.ecommerce.model.SellerProfile;
 import com.luxe.ecommerce.model.User;
+import com.luxe.ecommerce.repository.SellerProfileRepository;
 import com.luxe.ecommerce.repository.UserRepository;
 import com.luxe.ecommerce.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -20,50 +24,46 @@ import java.util.UUID;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final SellerProfileRepository sellerProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
     private final GoogleTokenVerifierService googleTokenVerifierService;
 
+    @Transactional
     public AuthDto.AuthResponse register(AuthDto.RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email already registered");
         }
+
+        Role role = resolveRequestedRole(request.getAccountType());
         User user = User.builder()
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .fullName(request.getFullName())
                 .phone(request.getPhone())
-                .role(User.Role.USER)
+                .role(role)
                 .enabled(true)
                 .build();
         userRepository.save(user);
-        String token = jwtUtil.generateToken(user.getEmail());
-        return new AuthDto.AuthResponse(token, user.getEmail(), user.getFullName(), user.getRole().name());
+
+        if (role == Role.SELLER) {
+            createSellerProfile(user);
+        }
+
+        return buildAuthResponse(user);
     }
 
     public AuthDto.AuthResponse login(AuthDto.LoginRequest request) {
-
-        try {
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            request.getEmail(),
-                            request.getPassword()));
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw e;
-        }
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        request.getEmail(),
+                        request.getPassword()));
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        String token = jwtUtil.generateToken(user.getEmail());
-
-        return new AuthDto.AuthResponse(
-                token,
-                user.getEmail(),
-                user.getFullName(),
-                user.getRole().name());
+        return buildAuthResponse(user);
     }
 
     @Transactional
@@ -78,8 +78,7 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User account is disabled");
         }
 
-        String token = jwtUtil.generateToken(user.getEmail());
-        return new AuthDto.AuthResponse(token, user.getEmail(), user.getFullName(), user.getRole().name());
+        return buildAuthResponse(user);
     }
 
     private User resolveGoogleUser(GoogleTokenVerifierService.GoogleUserProfile googleProfile) {
@@ -93,7 +92,6 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "That email is already linked to another Google account");
         }
 
-        // Only auto-link existing password accounts when Google is authoritative for the email.
         if ((existingUser.getGoogleId() == null || existingUser.getGoogleId().isBlank())
                 && !googleProfile.hasAuthoritativeGoogleEmail()) {
             throw new ResponseStatusException(
@@ -116,7 +114,7 @@ public class AuthService {
                 .password(passwordEncoder.encode(UUID.randomUUID().toString()))
                 .fullName(resolveFullName(googleProfile))
                 .googleId(googleProfile.getGoogleId())
-                .role(User.Role.USER)
+                .role(Role.USER)
                 .enabled(true)
                 .build();
 
@@ -130,5 +128,31 @@ public class AuthService {
 
         int atIndex = googleProfile.getEmail().indexOf('@');
         return atIndex > 0 ? googleProfile.getEmail().substring(0, atIndex) : googleProfile.getEmail();
+    }
+
+    private Role resolveRequestedRole(String accountType) {
+        return "SELLER".equalsIgnoreCase(accountType) ? Role.SELLER : Role.USER;
+    }
+
+    private SellerProfile createSellerProfile(User user) {
+        return sellerProfileRepository.save(SellerProfile.builder()
+                .user(user)
+                .businessName(user.getFullName() == null ? "" : user.getFullName().trim())
+                .status(SellerApprovalStatus.DRAFT)
+                .build());
+    }
+
+    private AuthDto.AuthResponse buildAuthResponse(User user) {
+        String token = jwtUtil.generateToken(user.getEmail());
+        String sellerApprovalStatus = sellerProfileRepository.findByUser(user)
+                .map(profile -> profile.getStatus().name())
+                .orElse(null);
+
+        return new AuthDto.AuthResponse(
+                token,
+                user.getEmail(),
+                user.getFullName(),
+                user.getRole().name(),
+                sellerApprovalStatus);
     }
 }

@@ -42,7 +42,8 @@ public class OrderService {
 
             Product product = cartItem.getProduct();
 
-            if (!product.isActive()) {
+            if (!product.isActive()
+                    || (product.getApprovalStatus() != null && product.getApprovalStatus() != ProductApprovalStatus.APPROVED)) {
                 throw new RuntimeException("Product is no longer available: " + product.getName());
             }
 

@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { FiShoppingCart, FiUser, FiSearch, FiMenu, FiX, FiLogOut, FiSettings } from 'react-icons/fi';
+import { FiShoppingCart, FiUser, FiSearch, FiMenu, FiX, FiLogOut, FiSettings, FiBriefcase } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 
 export default function Navbar() {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, isSeller } = useAuth();
   const { cart } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
@@ -84,6 +84,11 @@ export default function Navbar() {
                   <Link to="/orders" className="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 hover:text-gold-500 hover:bg-luxe-dark transition-colors">
                     <FiUser size={14} /> My Orders
                   </Link>
+                  {isSeller && (
+                    <Link to="/seller" className="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 hover:text-gold-500 hover:bg-luxe-dark transition-colors">
+                      <FiBriefcase size={14} /> Seller Studio
+                    </Link>
+                  )}
                   {isAdmin && (
                     <Link to="/admin" className="flex items-center gap-2 px-4 py-3 text-sm text-gray-300 hover:text-gold-500 hover:bg-luxe-dark transition-colors">
                       <FiSettings size={14} /> Admin Panel
@@ -108,10 +113,16 @@ export default function Navbar() {
         {/* Mobile menu */}
         {menuOpen && (
           <div className="md:hidden border-t border-luxe-border py-4 animate-fade-in">
-            {['/', '/products', '/orders'].map((path, i) => (
-              <Link key={i} to={path} onClick={() => setMenuOpen(false)}
+            {[
+              { path: '/', label: 'Home' },
+              { path: '/products', label: 'Products' },
+              ...(user ? [{ path: '/orders', label: 'My Orders' }] : []),
+              ...(isSeller ? [{ path: '/seller', label: 'Seller Studio' }] : []),
+              ...(isAdmin ? [{ path: '/admin', label: 'Admin Panel' }] : []),
+            ].map((item) => (
+              <Link key={item.path} to={item.path} onClick={() => setMenuOpen(false)}
                 className="block py-3 text-xs tracking-widest uppercase text-gray-400 hover:text-gold-500">
-                {['Home', 'Products', 'My Orders'][i]}
+                {item.label}
               </Link>
             ))}
           </div>

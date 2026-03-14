@@ -12,6 +12,7 @@ import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
 import { OrdersPage, OrderDetailPage } from './pages/OrdersPage';
 import AdminPage from './pages/AdminPage';
+import SellerPage from './pages/SellerPage';
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
@@ -22,6 +23,13 @@ function AdminRoute({ children }) {
   const { user, isAdmin } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   if (!isAdmin) return <Navigate to="/" replace />;
+  return children;
+}
+
+function SellerRoute({ children }) {
+  const { user, isSeller } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (!isSeller) return <Navigate to="/" replace />;
   return children;
 }
 
@@ -53,6 +61,7 @@ export default function App() {
               <Route path="/orders" element={<PrivateRoute><OrdersPage /></PrivateRoute>} />
               <Route path="/orders/:id" element={<PrivateRoute><OrderDetailPage /></PrivateRoute>} />
               <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
+              <Route path="/seller" element={<SellerRoute><SellerPage /></SellerRoute>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Layout>

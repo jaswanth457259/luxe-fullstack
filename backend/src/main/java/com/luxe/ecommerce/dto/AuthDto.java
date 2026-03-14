@@ -16,6 +16,7 @@ public class AuthDto {
         @NotBlank
         private String fullName;
         private String phone;
+        private String accountType;
     }
 
     @Data
@@ -38,12 +39,14 @@ public class AuthDto {
         private String email;
         private String fullName;
         private String role;
+        private String sellerApprovalStatus;
 
-        public AuthResponse(String token, String email, String fullName, String role) {
+        public AuthResponse(String token, String email, String fullName, String role, String sellerApprovalStatus) {
             this.token = token;
             this.email = email;
             this.fullName = fullName;
             this.role = role;
+            this.sellerApprovalStatus = sellerApprovalStatus;
         }
     }
 }

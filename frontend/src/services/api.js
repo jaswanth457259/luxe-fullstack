@@ -60,11 +60,25 @@ export const orderApi = {
 // Admin
 export const adminApi = {
   getStats: () => api.get('/admin/stats'),
+  getPendingSellerReviews: (params) => api.get('/admin/reviews/sellers', { params }),
+  reviewSeller: (id, data) => api.post(`/admin/reviews/sellers/${id}/decision`, data),
+  getPendingProductReviews: (params) => api.get('/admin/reviews/products', { params }),
+  reviewProduct: (id, data) => api.post(`/admin/reviews/products/${id}/decision`, data),
   importProductsCsv: (file) => {
     const formData = new FormData();
     formData.append('file', file);
     return api.post('/admin/products/import-csv', formData);
   },
+};
+
+// Seller
+export const sellerApi = {
+  getProfile: () => api.get('/seller/profile'),
+  updateProfile: (data) => api.put('/seller/profile', data),
+  getProducts: (params) => api.get('/seller/products', { params }),
+  createProduct: (data) => api.post('/seller/products', data),
+  updateProduct: (id, data) => api.put(`/seller/products/${id}`, data),
+  submitProduct: (id) => api.post(`/seller/products/${id}/submit`),
 };
 
 export default api;

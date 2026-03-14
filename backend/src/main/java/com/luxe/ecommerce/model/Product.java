@@ -1,6 +1,7 @@
 package com.luxe.ecommerce.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
@@ -42,6 +43,30 @@ public class Product {
 
     @Column(nullable = false)
     private boolean active = true;
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "seller_id")
+    private User seller;
+
+    @Enumerated(EnumType.STRING)
+    private ProductApprovalStatus approvalStatus = ProductApprovalStatus.APPROVED;
+
+    private Integer aiReviewScore;
+
+    @Column(columnDefinition = "TEXT")
+    private String aiReviewSummary;
+
+    @Column(columnDefinition = "TEXT")
+    private String aiReviewIssues;
+
+    private String aiRecommendation;
+
+    @Column(columnDefinition = "TEXT")
+    private String adminNotes;
+
+    private LocalDateTime submittedAt;
+    private LocalDateTime reviewedAt;
 
     private Double rating = 0.0;
     private Integer reviewCount = 0;
