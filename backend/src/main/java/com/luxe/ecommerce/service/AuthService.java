@@ -190,9 +190,17 @@ public class AuthService {
                     ex);
         }
 
-        String sellerApprovalStatus = sellerProfileRepository.findByUser(user)
-                .map(profile -> profile.getStatus().name())
-                .orElse(null);
+        String sellerApprovalStatus = null;
+        try {
+            sellerApprovalStatus = sellerProfileRepository.findByUser(user)
+                    .map(profile -> profile.getStatus() == null ? null : profile.getStatus().name())
+                    .orElse(user.getRole() == Role.SELLER ? SellerApprovalStatus.DRAFT.name() : null);
+        } catch (Exception ex) {
+            log.warn("Seller profile status lookup failed for user {}: {}", user.getEmail(), ex.getMessage());
+            if (user.getRole() == Role.SELLER) {
+                sellerApprovalStatus = SellerApprovalStatus.DRAFT.name();
+            }
+        }
 
         return new AuthDto.AuthResponse(
                 token,
