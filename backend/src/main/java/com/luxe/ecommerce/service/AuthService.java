@@ -35,7 +35,6 @@ public class AuthService {
     private final GoogleTokenVerifierService googleTokenVerifierService;
     private final JdbcTemplate jdbcTemplate;
 
-    @Transactional
     public AuthDto.AuthResponse register(AuthDto.RegisterRequest request) {
         String normalizedEmail = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
         String normalizedFullName = request.getFullName() == null ? "" : request.getFullName().trim();
