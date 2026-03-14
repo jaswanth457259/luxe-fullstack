@@ -1,4 +1,5 @@
 import { Clerk } from '@clerk/clerk-js';
+import { ClerkUI } from '@clerk/ui';
 
 const PENDING_ACCOUNT_TYPE_KEY = 'luxe_pending_account_type';
 
@@ -21,7 +22,11 @@ export async function getClerkInstance() {
   if (!clerkPromise) {
     clerkPromise = (async () => {
       const clerk = new Clerk(publishableKey);
-      await clerk.load();
+      await clerk.load({
+        ui: {
+          ClerkUI,
+        },
+      });
       return clerk;
     })();
   }
