@@ -41,6 +41,7 @@ function AccountTypeSelector({ value, onChange }) {
 function ClerkPanel({ mode }) {
   const containerRef = useRef(null);
   const { clerkEnabled, clerkReady } = useAuth();
+  const [mountError, setMountError] = useState('');
 
   useEffect(() => {
     if (!clerkEnabled || !clerkReady || !containerRef.current) {
@@ -51,19 +52,31 @@ function ClerkPanel({ mode }) {
     let cleanup = null;
 
     (async () => {
-      const clerk = await getClerkInstance();
-      if (!active || !clerk || !containerRef.current) {
-        return;
-      }
+      try {
+        setMountError('');
+        const clerk = await getClerkInstance();
+        if (!active || !clerk || !containerRef.current) {
+          return;
+        }
 
-      if (mode === 'sign-up') {
-        clerk.mountSignUp(containerRef.current);
-        cleanup = () => clerk.unmountSignUp(containerRef.current);
-      } else {
-        clerk.mountSignIn(containerRef.current);
-        cleanup = () => clerk.unmountSignIn(containerRef.current);
+        if (mode === 'sign-up') {
+          clerk.mountSignUp(containerRef.current);
+          cleanup = () => clerk.unmountSignUp(containerRef.current);
+        } else {
+          clerk.mountSignIn(containerRef.current);
+          cleanup = () => clerk.unmountSignIn(containerRef.current);
+        }
+      } catch (error) {
+        const message = error?.errors?.[0]?.longMessage
+          || error?.errors?.[0]?.message
+          || error?.message
+          || 'Clerk widget failed to load. Check Clerk dashboard auth settings and allowed origins.';
+        console.error('Clerk mount failed:', error);
+        if (active) {
+          setMountError(message);
+        }
       }
-    })().catch(() => {});
+    })();
 
     return () => {
       active = false;
@@ -83,6 +96,14 @@ function ClerkPanel({ mode }) {
 
   if (!clerkReady) {
     return <div className="font-sans text-sm text-gray-400">Loading Clerk...</div>;
+  }
+
+  if (mountError) {
+    return (
+      <div className="rounded-sm border border-red-500/40 bg-red-500/10 px-4 py-3 font-sans text-sm text-red-200">
+        {mountError}
+      </div>
+    );
   }
 
   return <div ref={containerRef} />;
