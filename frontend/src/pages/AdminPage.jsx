@@ -85,6 +85,23 @@ export default function AdminPage() {
   const [importing, setImporting] = useState(false);
   const [lastImportResult, setLastImportResult] = useState(null);
   const fileInputRef = useRef(null);
+  const [adminAccessError, setAdminAccessError] = useState('');
+
+  const handleAdminLoadError = (error, fallbackMessage) => {
+    const status = error?.response?.status;
+    const message = error?.response?.data?.message;
+
+    if (status === 403) {
+      setAdminAccessError('Your current session does not have admin permission. Please log in with an admin account.');
+      toast.error('Admin access denied (403). Log in with an admin account.');
+      return;
+    }
+
+    const resolved = message || fallbackMessage;
+    if (resolved) {
+      toast.error(resolved);
+    }
+  };
 
   const loadStats = async () => {
     const response = await adminApi.getStats();
@@ -112,11 +129,11 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    loadStats().catch(() => {});
-    loadProducts().catch(() => {});
-    loadOrders().catch(() => {});
-    loadSellerReviews().catch(() => {});
-    loadProductReviews().catch(() => {});
+    loadStats().catch((error) => handleAdminLoadError(error, 'Failed to load admin stats'));
+    loadProducts().catch((error) => handleAdminLoadError(error, 'Failed to load products'));
+    loadOrders().catch((error) => handleAdminLoadError(error, 'Failed to load orders'));
+    loadSellerReviews().catch((error) => handleAdminLoadError(error, 'Failed to load seller reviews'));
+    loadProductReviews().catch((error) => handleAdminLoadError(error, 'Failed to load product reviews'));
   }, []);
 
   const handleImportClick = () => {
@@ -225,6 +242,12 @@ export default function AdminPage() {
           </button>
         ))}
       </div>
+
+      {adminAccessError && (
+        <div className="card-luxe p-4 mb-6 border border-red-500/40 text-red-300 font-sans text-sm">
+          {adminAccessError}
+        </div>
+      )}
 
       {tab === 'dashboard' && (
         <div>
