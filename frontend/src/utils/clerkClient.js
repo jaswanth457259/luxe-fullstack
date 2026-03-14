@@ -27,7 +27,11 @@ function loadClerkScript() {
 }
 
 export async function getClerkInstance() {
-  const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+  const publishableKey = (
+    import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+    || import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+    || ''
+  ).trim();
   if (!publishableKey) {
     return null;
   }
