@@ -39,9 +39,22 @@ export async function getClerkInstance() {
   if (!clerkPromise) {
     clerkPromise = (async () => {
       await loadClerkScript();
-      const clerk = new window.Clerk(publishableKey);
-      await clerk.load();
-      return clerk;
+      const clerkGlobal = window.Clerk;
+
+      // CDN-loaded Clerk exposes a global object that expects the key in load().
+      if (clerkGlobal && typeof clerkGlobal.load === 'function' && typeof clerkGlobal !== 'function') {
+        await clerkGlobal.load({ publishableKey });
+        return clerkGlobal;
+      }
+
+      // Bundled/NPM-style Clerk exposes a constructor that accepts the key.
+      if (typeof clerkGlobal === 'function') {
+        const clerk = new clerkGlobal(publishableKey);
+        await clerk.load();
+        return clerk;
+      }
+
+      throw new Error('Clerk SDK loaded but initialization API was not found');
     })();
   }
 
