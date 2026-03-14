@@ -6,6 +6,7 @@ import com.luxe.ecommerce.repository.UserRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -17,6 +18,7 @@ public class LuxeApplication {
     }
 
     @Bean
+    @ConditionalOnProperty(value = "app.bootstrap-admin.enabled", havingValue = "true", matchIfMissing = true)
     CommandLineRunner initAdmin(UserRepository userRepository,
             PasswordEncoder passwordEncoder) {
         return args -> {

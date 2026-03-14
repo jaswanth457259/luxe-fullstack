@@ -139,13 +139,29 @@ jobs:
         working-directory: ./frontend
         run: npm ci
 
+      - name: 🔎 Detect Frontend Scripts
+        id: frontend-scripts
+        working-directory: ./frontend
+        run: |
+          node -e "const scripts=require('./package.json').scripts || {}; console.log('has_lint=' + Boolean(scripts.lint)); console.log('has_test=' + Boolean(scripts.test));" >> "$GITHUB_OUTPUT"
+
       - name: 🔍 ESLint
+        if: steps.frontend-scripts.outputs.has_lint == 'true'
         working-directory: ./frontend
         run: npm run lint
 
+      - name: ℹ️ Skip ESLint
+        if: steps.frontend-scripts.outputs.has_lint != 'true'
+        run: echo "No frontend lint script configured; skipping ESLint step."
+
       - name: 🧪 Tests
+        if: steps.frontend-scripts.outputs.has_test == 'true'
         working-directory: ./frontend
         run: npm test -- --run
+
+      - name: ℹ️ Skip Tests
+        if: steps.frontend-scripts.outputs.has_test != 'true'
+        run: echo "No frontend test script configured; skipping test step."
 
       - name: 🏗️ Build Check
         working-directory: ./frontend

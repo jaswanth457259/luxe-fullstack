@@ -471,10 +471,10 @@ npm run dev
 
 ### Local URLs
 
-- Frontend: `http://localhost:3000`
+- Frontend: `http://localhost:5173`
 - Backend API: `http://localhost:8080/api`
 - Swagger UI: `http://localhost:8080/api/swagger-ui.html`
-- CSV template: `http://localhost:3000/product-import-template.csv`
+- CSV template: `http://localhost:5173/product-import-template.csv`
 
 ### Google Sign-In Configuration
 

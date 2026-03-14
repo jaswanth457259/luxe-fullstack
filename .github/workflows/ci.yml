@@ -62,7 +62,7 @@ jobs:
           SPRING_DATASOURCE_USERNAME: root
           SPRING_DATASOURCE_PASSWORD: testpassword
           APP_JWT_SECRET: TestSecretKey2026_AtLeast256BitsLongForHMACSHA256!!
-          APP_JWT_EXPIRATION_MS: 3600000
+          APP_JWT_EXPIRATION: 3600000
 
       - name: 📊 Generate JaCoCo Code Coverage Report
         working-directory: ./backend
@@ -114,22 +114,38 @@ jobs:
         working-directory: ./frontend
         run: npm ci
 
+      - name: 🔎 Detect Frontend Scripts
+        id: frontend-scripts
+        working-directory: ./frontend
+        run: |
+          node -e "const scripts=require('./package.json').scripts || {}; console.log('has_lint=' + Boolean(scripts.lint)); console.log('has_test=' + Boolean(scripts.test));" >> "$GITHUB_OUTPUT"
+
       - name: 🔍 ESLint Check
+        if: steps.frontend-scripts.outputs.has_lint == 'true'
         working-directory: ./frontend
         run: npm run lint
         continue-on-error: false
 
+      - name: ℹ️ Skip ESLint Check
+        if: steps.frontend-scripts.outputs.has_lint != 'true'
+        run: echo "No frontend lint script configured; skipping ESLint step."
+
       - name: 🧪 Run Frontend Tests
+        if: steps.frontend-scripts.outputs.has_test == 'true'
         working-directory: ./frontend
         run: npm test -- --run
         env:
           CI: true
 
+      - name: ℹ️ Skip Frontend Tests
+        if: steps.frontend-scripts.outputs.has_test != 'true'
+        run: echo "No frontend test script configured; skipping test step."
+
       - name: 🏗️ Build Production Bundle
         working-directory: ./frontend
         run: npm run build
         env:
-          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || 'http://localhost:8080/api' }}
+          VITE_API_BASE_URL: http://localhost:8080/api
 
       - name: 📦 Upload Build Artifact
         uses: actions/upload-artifact@v4

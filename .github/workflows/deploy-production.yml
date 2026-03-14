@@ -207,6 +207,8 @@ jobs:
       - name: 🧪 Smoke Test Production
         run: |
           BASE="https://luxe-api.railway.app/api"
+          EMAIL="smoke-$(date +%s)@luxe.test"
+          PASSWORD="SmokeTest123!"
 
           echo "1. Testing health endpoint..."
           curl -sf "$BASE/actuator/health" | python3 -c \
@@ -218,16 +220,16 @@ jobs:
             "import sys,json; d=json.load(sys.stdin); print(d['totalElements'])")
           echo "✅ Products endpoint returned $COUNT items"
 
-          echo "3. Testing auth endpoint..."
-          TOKEN=$(curl -sf -X POST "$BASE/auth/login" \
+          echo "3. Testing registration endpoint..."
+          TOKEN=$(curl -sf -X POST "$BASE/auth/register" \
             -H "Content-Type: application/json" \
-            -d '{"email":"alex@luxe.com","password":"password"}' | \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\",\"fullName\":\"Smoke Test\"}" | \
             python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
-          [ -n "$TOKEN" ] && echo "✅ Auth works" || (echo "❌ Auth failed"; exit 1)
+          [ -n "$TOKEN" ] && echo "✅ Registration works" || (echo "❌ Registration failed"; exit 1)
 
           echo "4. Testing authenticated endpoint..."
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer $TOKEN" "$BASE/users/me")
+            -H "Authorization: Bearer $TOKEN" "$BASE/cart")
           [ "$STATUS" = "200" ] && echo "✅ Auth guard works" || (echo "❌ Auth guard failed"; exit 1)
 
           echo ""
@@ -261,7 +263,7 @@ jobs:
       - name: 🏷️ Create Release Tag & Notes
         uses: ncipollo/release-action@v1
         with:
-          tag: "v${{ github.run_number }}-${{ github.sha && github.sha[:7] || 'latest' }}"
+          tag: "v${{ github.run_number }}"
           name: "Production Release #${{ github.run_number }}"
           body: |
             ## 🚀 Production Deployment

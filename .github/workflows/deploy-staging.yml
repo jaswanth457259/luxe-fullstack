@@ -152,18 +152,20 @@ jobs:
       - name: 🧪 Run API Smoke Tests
         run: |
           BASE="https://luxe-api-staging.railway.app/api"
+          EMAIL="smoke-$(date +%s)@luxe.test"
+          PASSWORD="SmokeTest123!"
 
-          echo "Testing /auth/login..."
-          RESPONSE=$(curl -s -X POST "$BASE/auth/login" \
+          echo "Testing /auth/register..."
+          RESPONSE=$(curl -s -X POST "$BASE/auth/register" \
             -H "Content-Type: application/json" \
-            -d '{"email":"alex@luxe.com","password":"password"}')
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\",\"fullName\":\"Smoke Test\"}")
           TOKEN=$(echo $RESPONSE | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])" 2>/dev/null)
           
           if [ -z "$TOKEN" ]; then
-            echo "❌ Login test FAILED"
+            echo "❌ Registration test FAILED"
             exit 1
           fi
-          echo "✅ Login test passed"
+          echo "✅ Registration test passed"
 
           echo "Testing GET /products..."
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/products")
@@ -173,9 +175,9 @@ jobs:
           fi
           echo "✅ Products endpoint test passed"
 
-          echo "Testing authenticated /users/me..."
+          echo "Testing authenticated /cart..."
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: Bearer $TOKEN" "$BASE/users/me")
+            -H "Authorization: Bearer $TOKEN" "$BASE/cart")
           if [ "$STATUS" != "200" ]; then
             echo "❌ Auth test FAILED (status: $STATUS)"
             exit 1
