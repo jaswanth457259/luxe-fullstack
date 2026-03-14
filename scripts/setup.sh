@@ -85,6 +85,7 @@ spring.datasource.url=jdbc:mysql://localhost:3306/luxe_ecommerce?createDatabaseI
 spring.datasource.username=luxe_user
 spring.datasource.password=luxe_password
 app.jwt.secret=LocalDevSecret_AtLeast256BitsLong_CHANGE_IN_PRODUCTION_PLEASE!!
+app.google.client-id=
 app.cors.allowed-origins=http://localhost:5173,http://localhost:3000
 EOF
   echo -e "${GREEN}✅ Created backend/src/main/resources/application-local.properties${NC}"
@@ -93,6 +94,7 @@ fi
 if [ ! -f "frontend/.env.local" ]; then
   cat > frontend/.env.local << 'EOF'
 VITE_API_BASE_URL=http://localhost:8080/api
+VITE_GOOGLE_CLIENT_ID=
 VITE_ENV=development
 EOF
   echo -e "${GREEN}✅ Created frontend/.env.local${NC}"

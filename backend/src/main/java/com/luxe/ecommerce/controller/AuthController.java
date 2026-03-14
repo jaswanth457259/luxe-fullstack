@@ -23,4 +23,9 @@ public class AuthController {
     public ResponseEntity<AuthDto.AuthResponse> login(@Valid @RequestBody AuthDto.LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
     }
+
+    @PostMapping("/google")
+    public ResponseEntity<AuthDto.AuthResponse> googleAuth(@Valid @RequestBody AuthDto.GoogleAuthRequest request) {
+        return ResponseEntity.ok(authService.googleAuth(request));
+    }
 }

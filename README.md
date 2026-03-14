@@ -428,7 +428,7 @@ BackendApp --> MySQL : JPA / SQL
 
 | Area | Endpoints |
 |---|---|
-| Auth | `POST /api/auth/register`, `POST /api/auth/login` |
+| Auth | `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/google` |
 | Products | `GET /api/products`, `GET /api/products/{id}`, `GET /api/products/categories`, `POST /api/products`, `PUT /api/products/{id}`, `DELETE /api/products/{id}` |
 | Cart | `GET /api/cart`, `POST /api/cart`, `PUT /api/cart/{itemId}?quantity={n}`, `DELETE /api/cart` |
 | Orders | `POST /api/orders`, `GET /api/orders`, `GET /api/orders/{id}`, `GET /api/orders/admin/all`, `PATCH /api/orders/{id}/status` |
@@ -475,6 +475,15 @@ npm run dev
 - Backend API: `http://localhost:8080/api`
 - Swagger UI: `http://localhost:8080/api/swagger-ui.html`
 - CSV template: `http://localhost:3000/product-import-template.csv`
+
+### Google Sign-In Configuration
+
+To enable Google login and registration, configure the same Google OAuth client in both apps:
+
+- Backend env: `GOOGLE_CLIENT_ID`
+- Frontend env: `VITE_GOOGLE_CLIENT_ID`
+
+The frontend sends the Google ID token to `POST /api/auth/google`, and the backend verifies it against the configured Google client ID before issuing the app's own JWT.
 
 ## Deployment Targets
 

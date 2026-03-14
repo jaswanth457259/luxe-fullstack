@@ -1,13 +1,17 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import GoogleAuthButton from '../components/auth/GoogleAuthButton';
+
+const hasGoogleSignIn = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
 export function LoginPage() {
-  const { login } = useAuth();
+  const { login, googleLogin } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,6 +25,19 @@ export function LoginPage() {
     } finally { setLoading(false); }
   };
 
+  const handleGoogleAuth = useCallback(async (credential) => {
+    setGoogleLoading(true);
+    try {
+      const user = await googleLogin(credential);
+      toast.success(`Welcome back, ${user.fullName}!`, { style: { background: '#181818', color: '#C9A84C', border: '1px solid #2A2A2A' } });
+      navigate(user.role === 'ADMIN' ? '/admin' : '/');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Google sign-in failed');
+    } finally {
+      setGoogleLoading(false);
+    }
+  }, [googleLogin, navigate]);
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4 page-enter">
       <div className="w-full max-w-md">
@@ -30,7 +47,16 @@ export function LoginPage() {
           <p className="font-sans text-sm text-gray-500 mt-1">Sign in to your account</p>
         </div>
         <div className="card-luxe p-8">
+          {hasGoogleSignIn && (
+            <div className="space-y-3">
+              <GoogleAuthButton text="signin_with" onCredential={handleGoogleAuth} disabled={loading || googleLoading} />
+              <p className="font-sans text-xs text-center text-gray-500">
+                Sign in instantly with your Google account
+              </p>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-5">
+            {hasGoogleSignIn && <div className="gold-divider" />}
             <div>
               <label className="font-sans text-xs tracking-widest uppercase text-gray-400 block mb-2">Email</label>
               <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})}
@@ -57,10 +83,11 @@ export function LoginPage() {
 }
 
 export function RegisterPage() {
-  const { register } = useAuth();
+  const { register, googleLogin } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: '', password: '', fullName: '', phone: '' });
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -74,6 +101,19 @@ export function RegisterPage() {
     } finally { setLoading(false); }
   };
 
+  const handleGoogleAuth = useCallback(async (credential) => {
+    setGoogleLoading(true);
+    try {
+      await googleLogin(credential);
+      toast.success('Account created! Welcome to LUXE', { style: { background: '#181818', color: '#C9A84C', border: '1px solid #2A2A2A' } });
+      navigate('/');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Google sign-up failed');
+    } finally {
+      setGoogleLoading(false);
+    }
+  }, [googleLogin, navigate]);
+
   return (
     <div className="min-h-screen flex items-center justify-center px-4 page-enter">
       <div className="w-full max-w-md">
@@ -83,7 +123,16 @@ export function RegisterPage() {
           <p className="font-sans text-sm text-gray-500 mt-1">Join the LUXE experience</p>
         </div>
         <div className="card-luxe p-8">
+          {hasGoogleSignIn && (
+            <div className="space-y-3">
+              <GoogleAuthButton text="signup_with" onCredential={handleGoogleAuth} disabled={loading || googleLoading} />
+              <p className="font-sans text-xs text-center text-gray-500">
+                Create your account with Google in one step
+              </p>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-5">
+            {hasGoogleSignIn && <div className="gold-divider" />}
             {[
               { key: 'fullName', label: 'Full Name', type: 'text', placeholder: 'John Doe' },
               { key: 'email', label: 'Email', type: 'email', placeholder: 'your@email.com' },

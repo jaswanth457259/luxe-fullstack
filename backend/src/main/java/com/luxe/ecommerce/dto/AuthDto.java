@@ -27,6 +27,12 @@ public class AuthDto {
     }
 
     @Data
+    public static class GoogleAuthRequest {
+        @NotBlank
+        private String credential;
+    }
+
+    @Data
     public static class AuthResponse {
         private String token;
         private String email;

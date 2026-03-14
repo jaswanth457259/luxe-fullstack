@@ -9,23 +9,28 @@ export function AuthProvider({ children }) {
     try { return JSON.parse(localStorage.getItem('luxe_user')); } catch { return null; }
   });
 
-  const login = useCallback(async (email, password) => {
-    const res = await authApi.login({ email, password });
-    const { token, ...userData } = res.data;
+  const storeSession = useCallback((authResponse) => {
+    const { token, ...userData } = authResponse;
     localStorage.setItem('luxe_token', token);
     localStorage.setItem('luxe_user', JSON.stringify(userData));
     setUser(userData);
     return userData;
   }, []);
 
+  const login = useCallback(async (email, password) => {
+    const res = await authApi.login({ email, password });
+    return storeSession(res.data);
+  }, [storeSession]);
+
   const register = useCallback(async (data) => {
     const res = await authApi.register(data);
-    const { token, ...userData } = res.data;
-    localStorage.setItem('luxe_token', token);
-    localStorage.setItem('luxe_user', JSON.stringify(userData));
-    setUser(userData);
-    return userData;
-  }, []);
+    return storeSession(res.data);
+  }, [storeSession]);
+
+  const googleLogin = useCallback(async (credential) => {
+    const res = await authApi.google({ credential });
+    return storeSession(res.data);
+  }, [storeSession]);
 
   const logout = useCallback(() => {
     localStorage.removeItem('luxe_token');
@@ -35,7 +40,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isAdmin: user?.role === 'ADMIN' }}>
+    <AuthContext.Provider value={{ user, login, register, googleLogin, logout, isAdmin: user?.role === 'ADMIN' }}>
       {children}
     </AuthContext.Provider>
   );
