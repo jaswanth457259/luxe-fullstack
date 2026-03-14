@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -32,6 +33,7 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
     private final GoogleTokenVerifierService googleTokenVerifierService;
+    private final JdbcTemplate jdbcTemplate;
 
     @Transactional
     public AuthDto.AuthResponse register(AuthDto.RegisterRequest request) {
@@ -47,32 +49,54 @@ public class AuthService {
         }
 
         Role role = resolveRequestedRole(request.getAccountType());
+        User user = User.builder()
+                .email(normalizedEmail)
+                .password(passwordEncoder.encode(request.getPassword()))
+                .fullName(normalizedFullName)
+                .phone(request.getPhone() == null ? "" : request.getPhone().trim())
+                .address("")
+                .role(role)
+                .enabled(true)
+                .build();
+
         try {
-            User user = User.builder()
-                    .email(normalizedEmail)
-                    .password(passwordEncoder.encode(request.getPassword()))
-                    .fullName(normalizedFullName)
-                    .phone(request.getPhone() == null ? "" : request.getPhone().trim())
-                    .address("")
-                    .role(role)
-                    .enabled(true)
-                    .build();
             userRepository.save(user);
-
-            if (role == Role.SELLER) {
-                try {
-                    createSellerProfile(user);
-                } catch (Exception ex) {
-                    // Keep account creation successful even if legacy seller profile schema
-                    // differs.
-                    log.warn("Seller profile creation failed for user {}: {}", user.getEmail(), ex.getMessage());
-                }
+        } catch (Exception ex) {
+            if (role == Role.SELLER && tryMigrateRoleColumnAndRetry(user, ex)) {
+                log.info("Retried seller registration successfully after users.role schema migration for {}",
+                        user.getEmail());
+            } else if (ex instanceof DataIntegrityViolationException) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Account already exists or profile data is invalid", ex);
+            } else {
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Registration failed due to database schema mismatch", ex);
             }
+        }
 
-            return buildAuthResponse(user);
-        } catch (DataIntegrityViolationException ex) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Account already exists or profile data is invalid", ex);
+        if (role == Role.SELLER) {
+            try {
+                createSellerProfile(user);
+            } catch (Exception ex) {
+                // Keep account creation successful even if legacy seller profile schema
+                // differs.
+                log.warn("Seller profile creation failed for user {}: {}", user.getEmail(), ex.getMessage());
+            }
+        }
+
+        return buildAuthResponse(user);
+    }
+
+    private boolean tryMigrateRoleColumnAndRetry(User user, Exception rootException) {
+        try {
+            log.warn("Seller insert failed for {}. Attempting users.role schema migration. Root cause: {}",
+                    user.getEmail(), rootException.getMessage());
+            jdbcTemplate.execute("ALTER TABLE users MODIFY COLUMN role VARCHAR(20) NOT NULL");
+            userRepository.save(user);
+            return true;
+        } catch (Exception migrationException) {
+            log.error("users.role schema migration failed", migrationException);
+            return false;
         }
     }
 
