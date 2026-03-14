@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { FiShoppingCart, FiUser, FiSearch, FiMenu, FiX, FiLogOut, FiSettings, FiBriefcase } from 'react-icons/fi';
+import { FiShoppingCart, FiUser, FiSearch, FiMenu, FiX, FiLogOut, FiSettings, FiBriefcase, FiSun, FiMoon } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function Navbar() {
   const { user, logout, isAdmin, isSeller } = useAuth();
   const { cart } = useCart();
+  const { isLight, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -72,6 +74,15 @@ export default function Navbar() {
                 </span>
               )}
             </Link>
+
+            <button
+              onClick={toggleTheme}
+              className="theme-icon-btn"
+              aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
+              title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
+            >
+              {isLight ? <FiMoon size={18} /> : <FiSun size={18} />}
+            </button>
 
             {/* User */}
             {user ? (
