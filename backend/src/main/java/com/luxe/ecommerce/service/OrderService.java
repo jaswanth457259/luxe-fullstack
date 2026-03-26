@@ -43,7 +43,8 @@ public class OrderService {
             Product product = cartItem.getProduct();
 
             if (!product.isActive()
-                    || (product.getApprovalStatus() != null && product.getApprovalStatus() != ProductApprovalStatus.APPROVED)) {
+                    || (product.getApprovalStatus() != null
+                            && product.getApprovalStatus() != ProductApprovalStatus.APPROVED)) {
                 throw new RuntimeException("Product is no longer available: " + product.getName());
             }
 
@@ -58,8 +59,7 @@ public class OrderService {
 
             total = total.add(
                     product.getPrice()
-                            .multiply(BigDecimal.valueOf(cartItem.getQuantity()))
-            );
+                            .multiply(BigDecimal.valueOf(cartItem.getQuantity())));
         }
 
         Order order = Order.builder()
@@ -128,8 +128,7 @@ public class OrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
-        Order.OrderStatus newStatus =
-                Order.OrderStatus.valueOf(status.toUpperCase());
+        Order.OrderStatus newStatus = Order.OrderStatus.valueOf(status.toUpperCase());
 
         // 🔄 If cancelling → restore stock
         if (newStatus == Order.OrderStatus.CANCELLED &&
